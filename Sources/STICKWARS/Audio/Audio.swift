@@ -2,7 +2,7 @@ import AVFoundation
 
 enum Sound: Int, CaseIterable {
     case pistol, smg, shotgun, rocket, plasma, blaster, charge, laser, explosion, shatter, pop, jump, land, hit, kill,
-         pickup, blip, reload, empty, grenade, bounce, portal, win, death
+         pickup, blip, reload, empty, grenade, bounce, portal, win, death, blackhole, collapse, saw, grind, zap, slash, clank
 }
 
 /// Synthesized sounds played through a round-robin pool of player nodes. The only singleton.
@@ -164,6 +164,13 @@ final class Audio {
         case .bounce: return sweep(0.05, 500, 300, decay: 60, gain: 0.35)
         case .portal: return mix(sweep(0.5, 200, 1200, decay: 4, wave: 1, gain: 0.12), sweep(0.5, 400, 2400, decay: 5, gain: 0.25))
         case .win: return mix(sweep(0.15, 523, 523, decay: 6, wave: 1, gain: 0.2), shifted(sweep(0.15, 659, 659, decay: 6, wave: 1, gain: 0.2), by: 0.15), shifted(sweep(0.4, 784, 784, decay: 4, wave: 1, gain: 0.2), by: 0.3))
+        case .blackhole: return mix(sweep(0.9, 420, 50, decay: 2.5, gain: 0.7), noise(0.9, cutoff: 0.05, decay: 2.5, gain: 0.8), sweep(0.9, 1200, 200, decay: 4, wave: 1, gain: 0.08))
+        case .collapse: return mix(sweep(0.25, 60, 900, decay: 6, gain: 0.5), shifted(noise(0.8, cutoff: 0.1, decay: 5, gain: 1.4), by: 0.2), shifted(sweep(0.5, 90, 30, decay: 6, gain: 1), by: 0.2))
+        case .saw: return mix(sweep(0.3, 900, 1400, decay: 8, wave: 1, gain: 0.18), noise(0.3, cutoff: 0.7, decay: 10, gain: 0.35))
+        case .grind: return mix(noise(0.14, cutoff: 0.9, decay: 25, gain: 0.5), sweep(0.14, 2400, 1600, decay: 25, wave: 2, gain: 0.15))
+        case .zap: return mix(noise(0.08, cutoff: 0.95, decay: 45, gain: 0.45), sweep(0.08, 1800, 2600, decay: 40, wave: 1, gain: 0.12))
+        case .slash: return mix(noise(0.16, cutoff: 0.55, decay: 22, gain: 0.6), sweep(0.14, 1500, 500, decay: 25, gain: 0.25))
+        case .clank: return mix(pings(5, dur: 0.35, lo: 900, hi: 2400), noise(0.1, cutoff: 0.8, decay: 40, gain: 0.5))
         case .death: return mix(sweep(0.4, 400, 60, decay: 7, wave: 1, gain: 0.25), noise(0.2, cutoff: 0.3, decay: 20, gain: 0.5))
         }
     }

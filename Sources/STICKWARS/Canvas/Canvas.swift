@@ -358,8 +358,9 @@ final class Canvas {
         ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
         ctx.restoreGState()
         ctx.addPath(path)
-        ctx.setStrokeColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.35))
-        ctx.setLineWidth(1.5)
+        // faint dark edge: gives the shard a crisp silhouette without a grey "glass" rim
+        ctx.setStrokeColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.3))
+        ctx.setLineWidth(1)
         ctx.strokePath()
         return ctx.makeImage()
     }

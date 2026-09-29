@@ -3,7 +3,7 @@ import AppKit
 /// Screen-sized synthetic "screenshot" for headless tests: a browser-like window with text,
 /// a photo-like gradient, buttons, icons and a dock.
 enum FakePage {
-    static func image(size: CGSize, scale: CGFloat = 2) -> CGImage {
+    static func image(size: CGSize, scale: CGFloat = 2, dark: Bool = false) -> CGImage {
         let w = Int(size.width * scale), h = Int(size.height * scale)
         let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: sRGB,
                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
@@ -104,6 +104,14 @@ enum FakePage {
         for i in 0..<8 {
             let r = CGRect(x: dock.minX + 12 + CGFloat(i) * 63, y: dock.minY + 8, width: 50, height: 50)
             fill(r, [NSColor.systemBlue, .systemRed, .systemGreen, .systemYellow, .systemPurple, .systemOrange, .systemCyan, .systemBrown][i], radius: 12)
+        }
+        if dark {
+            // dark-mode variant: invert everything
+            NSGraphicsContext.current = nil
+            ctx.resetClip()
+            ctx.setBlendMode(.difference)
+            ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+            ctx.fill(CGRect(x: -10, y: -10, width: size.width + 20, height: size.height + 20))
         }
         return ctx.makeImage()!
     }

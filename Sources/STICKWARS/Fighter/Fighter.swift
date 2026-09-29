@@ -7,13 +7,14 @@ struct FighterInput {
     var jet = false
     var fire = false, firePressed = false, fireReleased = false
     var grenade = false
+    var melee = false
     var reload = false
     var aim = CGPoint.zero
     var switchTo = -1
 
     mutating func clearEdges() {
         jumpPressed = false; downPressed = false; firePressed = false; fireReleased = false
-        grenade = false; reload = false; switchTo = -1
+        grenade = false; melee = false; reload = false; switchTo = -1
     }
 }
 
@@ -63,6 +64,9 @@ final class Fighter {
     var flipT: CGFloat = 1        // < 1 while front-flipping
     var hitKick: CGFloat = 0, hitDirX: CGFloat = 0
     var switchT: CGFloat = 1
+    var slashT: CGFloat = 1        // < 1 while swinging the knife
+    var knifeCD = 0.0
+    var armor: CGFloat = 0         // absorbs most damage until it breaks
     var landKick: CGFloat = 0
     let hpBack = SKSpriteNode(texture: Tex.white), hpFill = SKSpriteNode(texture: Tex.white)
     let marker = SKSpriteNode()

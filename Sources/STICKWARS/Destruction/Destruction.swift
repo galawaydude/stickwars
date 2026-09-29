@@ -178,20 +178,33 @@ extension GameScene {
             }
         }
 
-        // 2. Crater: scorch, shatter part of it into shards cut from the real pixels, erase, crack.
+        // 2. Crater: shatter the parts that show real content into shards cut from the pixels (taken
+        // before any scorching, so they keep their true colours). Flat areas (plain backgrounds)
+        // turn into pixel dust instead of featureless grey triangles.
         let fr = Fracture.make(center: p, radius: R * 0.55, rng: &rng)
-        c.scorch(p, radius: R * 0.95, seed: rng.next())
         var shards = 0
-        for cell in fr.cells where shards < 14 && (cell.ring == fr.rings || rng.chance(0.4)) {
+        for cell in fr.cells where shards < 12 && (cell.ring == fr.rings || rng.chance(0.4)) {
             let b = Fracture.bounds(cell.poly)
             let centroid = b.center
-            guard c.color(at: centroid).a > 20, let img = c.cropPolygon(cell.poly, bounds: b) else { continue }
             let d = (centroid - p).normalized
+            guard c.color(at: centroid).a > 20 else { continue }
+            if isFlat(c, b) {
+                let col = c.color(at: centroid).sk
+                for _ in 0..<4 {
+                    let q = CGPoint(x: rng.range(b.minX, b.maxX), y: rng.range(b.minY, b.maxY))
+                    let sp = rng.range(200, 520)
+                    particles.emit(q.x, q.y, vx: d.x * sp + rng.range(-60, 60), vy: d.y * sp + rng.range(80, 220), life: rng.range(0.5, 0.9),
+                                   color: col, size: rng.chance(0.5) ? 3 : 4, gravity: 1100, drag: 1)
+                }
+                continue
+            }
+            guard let img = c.cropPolygon(cell.poly, bounds: b) else { continue }
             let s = rng.range(350, 750)
             // the crop is pixel-aligned; place the sprite on the same pixel rect
             debris.spawn(img, rect: c.aligned(b), poly: cell.core, vel: CGVector(dx: d.x * s, dy: d.y * s + 250), spin: rng.range(-12, 12), time: simTime)
             shards += 1
         }
+        c.scorch(p, radius: R * 0.95, seed: rng.next())
         c.fillPolygon(fr.outline, clearColor)
         for crack in fr.cracks { c.drawPolyline(crack, RGBA(12, 10, 14), alpha: 0.85, width: 2) }
         for i in crumbleList where level.elements[i].state == .solid { crumble(i, from: p) }
@@ -228,6 +241,18 @@ extension GameScene {
             f.grounded = false
         }
         debris.blast(p, radius: R, speed: 900)
+    }
+
+    /// True when a region is one plain colour (sampled on a small grid).
+    func isFlat(_ c: Canvas, _ r: CGRect) -> Bool {
+        var lo = (255, 255, 255), hi = (0, 0, 0)
+        for gy in 0..<4 { for gx in 0..<4 {
+            let q = CGPoint(x: r.minX + r.width * (CGFloat(gx) + 0.5) / 4, y: r.minY + r.height * (CGFloat(gy) + 0.5) / 4)
+            let v = c.color(at: q)
+            lo = (min(lo.0, Int(v.r)), min(lo.1, Int(v.g)), min(lo.2, Int(v.b)))
+            hi = (max(hi.0, Int(v.r)), max(hi.1, Int(v.g)), max(hi.2, Int(v.b)))
+        } }
+        return (hi.0 - lo.0) + (hi.1 - lo.1) + (hi.2 - lo.2) < 36
     }
 
     @inline(__always) func pan(_ p: CGPoint) -> Float { Float((p.x / size.width) * 2 - 1) * 0.7 }

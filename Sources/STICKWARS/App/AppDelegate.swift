@@ -104,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
         for line in ["A / D  move", "W / Space  jump (double, wall)", "S  drop through / fast fall", "Shift  jetpack",
-                     "Mouse  aim · click fire", "Right click  grenade", "1–7 / scroll  weapon · R reload", "Esc / ⌥⇧F  pause · F3 debug"] {
+                     "Mouse  aim · click fire", "Right click  grenade · F knife", "1–9, 0 / scroll  weapon · R reload", "Esc / ⌥⇧F  pause · F3 debug"] {
             let i = NSMenuItem(title: line, action: nil, keyEquivalent: ""); i.isEnabled = false
             menu.addItem(i)
         }

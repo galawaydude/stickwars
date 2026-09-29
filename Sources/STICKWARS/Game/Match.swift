@@ -1,6 +1,9 @@
 import SpriteKit
 
+enum PickupKind { case health, armor }
+
 struct Pickup {
+    var kind: PickupKind
     var pos: CGPoint
     var node: SKSpriteNode
     var born: Double
@@ -164,24 +167,37 @@ extension GameScene {
         }
         if !portals.isEmpty { for (i, p) in portals.enumerated() where fighters[i].alive && !p.isHidden { p.texture = Art.portalFrames[Int(simTime * 12) % 3] } }
 
-        // health pickups
-        if simTime >= pickupAt && pickups.count < 2 && !extracting && level.solidCount > 0 {
-            pickupAt = simTime + 12
-            let p = spawnPoint() + CGPoint(x: 0, y: 12)
-            let n = SKSpriteNode(texture: Art.medkit, size: CGSize(width: 20, height: 20))
+        // health and armour pickups
+        if simTime >= pickupAt && pickups.count < 3 && !extracting && level.solidCount > 0 {
+            pickupAt = simTime + 10
+            let armors = pickups.filter { $0.kind == .armor }.count
+            let kind: PickupKind = armors == 0 && rng.chance(0.5) ? .armor : .health
+            let p = spawnPoint() + CGPoint(x: 0, y: 14)
+            let svg = kind == .armor ? GunArts.armorPickup : GunArts.medkit
+            let n = SKSpriteNode(texture: svg.texture(kind == .armor ? "pk-armor" : "pk-med"), size: svg.size)
             n.position = p; n.zPosition = 15
             world.addChild(n)
-            pickups.append(Pickup(pos: p, node: n, born: simTime))
+            pickups.append(Pickup(kind: kind, pos: p, node: n, born: simTime))
         }
         var k = 0
         while k < pickups.count {
             let pk = pickups[k]
             pk.node.position = CGPoint(x: pk.pos.x, y: (pk.pos.y + 3 * sin(CGFloat(simTime - pk.born) * 3)).rounded())
             var taken = false
-            for f in fighters where f.alive && f.hp < 100 && f.bodyRect.insetBy(dx: -8, dy: -4).contains(pk.pos) {
-                f.hp = min(100, f.hp + 40)
+            for f in fighters where f.alive && f.bodyRect.insetBy(dx: -8, dy: -4).contains(pk.pos) {
+                switch pk.kind {
+                case .health:
+                    guard f.hp < 100 else { continue }
+                    f.hp = min(100, f.hp + 40)
+                    particles.burst(pk.pos, n: 12, speed: 160, life: 0.5, color: SKColor(srgbRed: 0.4, green: 1, blue: 0.5, alpha: 1), size: 2, gravity: -100)
+                case .armor:
+                    guard f.armor < 100 else { continue }
+                    f.armor = min(100, f.armor + 75)
+                    particles.burst(pk.pos, n: 14, speed: 180, life: 0.5, color: SKColor(srgbRed: 0.4, green: 0.8, blue: 1, alpha: 1), size: 2, gravity: -100)
+                    Audio.shared.play(.clank, volume: 0.45, pan: pan(pk.pos))
+                }
+                if f.isPlayer { hud.callout(pk.kind == .armor ? "ARMOR" : "+40 HP", color: pk.kind == .armor ? .cyan : .green) }
                 taken = true
-                particles.burst(pk.pos, n: 12, speed: 160, life: 0.5, color: SKColor(srgbRed: 0.4, green: 1, blue: 0.5, alpha: 1), size: 2, gravity: -100)
                 Audio.shared.play(.pickup, volume: 0.6, pan: pan(pk.pos))
                 break
             }
@@ -201,9 +217,9 @@ extension GameScene {
                        sub: "NEW MATCH IN \(left)")
     }
 
-    func nearestPickup(to p: CGPoint) -> CGPoint? {
+    func nearestPickup(to p: CGPoint, _ kind: PickupKind = .health) -> CGPoint? {
         var best: CGPoint?, bd = CGFloat.infinity
-        for pk in pickups { let d = pk.pos.dist(p); if d < bd { bd = d; best = pk.pos } }
+        for pk in pickups where pk.kind == kind { let d = pk.pos.dist(p); if d < bd { bd = d; best = pk.pos } }
         return best
     }
 

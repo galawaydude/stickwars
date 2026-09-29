@@ -39,10 +39,16 @@ grants survive rebuilds and reinstalls.
 | Shift | jetpack |
 | Mouse, left click | aim, fire (hold for automatic weapons, hold and release to charge the blaster) |
 | Right click | grenade (3, recharging) |
-| 1–7, scroll | pistol, SMG, shotgun, rocket, plasma, blaster, laser |
+| 1–9, 0, scroll | pistol, SMG, shotgun, rocket, plasma, blaster, laser, black hole, saw, lightning |
+| F (or V) | knife slash |
 | R | reload |
 | F3 | debug overlay (FPS, update ms, elements, bodies, particles, dirty tiles) |
 | Esc, ⌥⇧F | pause and hide |
+
+Health and armour pickups spawn around the level: armour (vest and helmet, shown on the fighter)
+soaks most damage until it breaks. The black hole gun opens a singularity that drags in letters,
+debris and fighters before collapsing; the saw launcher ricochets and cuts through text; the lightning
+gun chains between enemies and letters. All weapon and gear art is SVG path data rendered in code.
 
 The menu has Play/Pause, New Match, Bots (0–5), Difficulty and Mute.
 
