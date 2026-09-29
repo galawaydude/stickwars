@@ -144,6 +144,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Loads the snapshot and (unless headless) takes over the screen with keyboard focus.
     func start(image: CGImage, appName: String, windows: [WindowInfo], headless: Bool) {
+        // Screen resolution changed since the scene was built: start over at the new size.
+        let size = NSScreen.screens[0].frame.size
+        if scene.size != size {
+            skView.frame = NSRect(origin: .zero, size: size)
+            scene = GameScene(size: size)
+            scene.app = self
+            skView.presentScene(scene)
+        }
         scene.loadSnapshot(image, appName: appName, windows: windows)
         playing = true
         starting = false
@@ -163,6 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         playItem?.title = "Play"
         skView.isPaused = true
         scene.didPause()
+        Audio.shared.stopAll()
         if cursorHidden { NSCursor.unhide(); cursorHidden = false }
         if window.isVisible {
             window.orderOut(nil)

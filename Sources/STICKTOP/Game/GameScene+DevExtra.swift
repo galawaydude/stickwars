@@ -35,6 +35,7 @@ extension GameScene {
             case .plasma: spawnProjectile(.plasma, at: from, vel: dir * def.speed, owner: -1, bounces: 3)
             }
             return "shot \(def.name)"
+        case "synth": return Audio.shared.synthCheck()
         case "bots":
             var out = "nav nodes=\(nav.nodes.count) edges=\(nav.edges.reduce(0) { $0 + $1.count })\n"
             for b in brains { out += b.debug(self) + "\n" }

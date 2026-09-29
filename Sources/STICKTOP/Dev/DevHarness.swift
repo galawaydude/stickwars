@@ -91,7 +91,11 @@ final class DevHarness {
         case "snap":
             let lines = a.contains("lines")
             let path = a.first(where: { $0.hasPrefix("/") }) ?? "/tmp/sticktop-snap.png"
-            return snap(path, lines: lines)
+            var crop: CGRect?
+            if let k = a.firstIndex(of: "crop"), k + 4 < a.count {
+                crop = CGRect(x: num(a, k + 1), y: num(a, k + 2), width: num(a, k + 3), height: num(a, k + 4)) // scene points
+            }
+            return snap(path, lines: lines, crop: crop)
         case "state":
             let ax = AXIsProcessTrusted(), sc = CGPreflightScreenCaptureAccess()
             return "screenRecording=\(sc) accessibility=\(ax) appActive=\(NSApp.isActive) windowKey=\(app.window.isKeyWindow) windowVisible=\(app.window.isVisible) viewPaused=\(app.skView.isPaused) playing=\(app.playing)\n" + scene.stateDump()
@@ -147,10 +151,15 @@ final class DevHarness {
         return String(format: "perf %d frames: avg %.3f ms (update %.3f ms) p95 %.3f worst %.3f ms main-thread CPU", n, total / Double(n), upd / Double(n), p95, worst)
     }
 
-    private func snap(_ path: String, lines: Bool) -> String {
+    private func snap(_ path: String, lines: Bool, crop: CGRect? = nil) -> String {
         guard let tex = app.skView.texture(from: scene) else { return "snap failed" }
         var img = tex.cgImage()
         if lines, let ov = scene.debugOverlay(on: img) { img = ov }
+        if let c = crop {
+            let s = CGFloat(img.width) / scene.size.width
+            let r = CGRect(x: c.minX * s, y: (scene.size.height - c.maxY) * s, width: c.width * s, height: c.height * s)
+            if let cr = img.cropping(to: r) { img = cr }
+        }
         let url = URL(fileURLWithPath: path) as CFURL
         guard let dst = CGImageDestinationCreateWithURL(url, UTType.png.identifier as CFString, 1, nil) else { return "snap write failed" }
         CGImageDestinationAddImage(dst, img, nil)

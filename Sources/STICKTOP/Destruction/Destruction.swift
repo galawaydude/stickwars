@@ -162,7 +162,7 @@ extension GameScene {
                 level.remove(i)
                 if p.x - cut > e.rect.minX + 20 { level.add(Element(rect: CGRect(x: e.rect.minX, y: e.rect.minY, width: p.x - cut - e.rect.minX, height: e.rect.height), kind: .ledge)) }
                 if e.rect.maxX > p.x + cut + 20 { level.add(Element(rect: CGRect(x: p.x + cut, y: e.rect.minY, width: e.rect.maxX - p.x - cut, height: e.rect.height), kind: .ledge)) }
-            case .image, .control where e.isBig:
+            case _ where e.isBig:
                 let overlap = e.rect.intersection(CGRect(x: p.x - R * 0.55, y: p.y - R * 0.55, width: R * 1.1, height: R * 1.1))
                 level.damage(i, hp: damage * 2 * fall, carved: overlap.isNull ? 0 : overlap.width * overlap.height * 0.8)
                 let ne = level.elements[i]
@@ -210,8 +210,8 @@ extension GameScene {
                            color: SKColor(white: rng.range(0.25, 0.45), alpha: 1), size: rng.chance(0.5) ? 6 : 8, gravity: -60, drag: 2)
         }
         particles.burst(p, n: 30, speed: 700, life: 0.5, color: SKColor(srgbRed: 1, green: 0.9, blue: 0.5, alpha: 1), size: 2, gravity: 600)
-        fx.spawn(Tex.circle, at: p, size: CGSize(width: R * 0.9, height: R * 0.9), color: SKColor(srgbRed: 1, green: 0.85, blue: 0.5, alpha: 1),
-                 life: 0.12, grow: 1.2, z: 3, add: true)
+        fx.spawn(Art.blast, at: p, size: CGSize(width: R * 1.1, height: R * 1.1), rotation: CGFloat(rng.int(4)) * .pi / 2,
+                 life: 0.14, grow: 0.6, z: 3, add: true)
 
         // 4. Fighters and debris.
         for f in fighters where f.alive {

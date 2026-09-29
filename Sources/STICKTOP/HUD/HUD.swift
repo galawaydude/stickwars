@@ -18,13 +18,13 @@ final class HUD {
     // cached shown values (avoid rebuilding strings every frame)
     private var shown = (app: "", kills: -1, hp: -1, weapon: -1, ammo: -1, grenades: -1, scores: -1)
 
-    static func panelTexture(_ w: Int, _ h: Int, border: SKColor = SKColor(white: 0.75, alpha: 1), fill: CGFloat = 0.62) -> SKTexture {
-        Tex.drawn("panel\(w)x\(h)\(border.hashValue)\(fill)", w, h, nearest: true) { c in
+    static func panelTexture(_ w: Int, _ h: Int, border: SKColor = SKColor(white: 0.75, alpha: 1), fill: CGFloat = 0.62, inner: CGFloat = 0.08) -> SKTexture {
+        Tex.drawn("panel\(w)x\(h)\(border.hashValue)\(fill)\(inner)", w, h, nearest: true) { c in
             c.setFillColor(CGColor(srgbRed: 0.05, green: 0.05, blue: 0.08, alpha: 0.95))
             c.fill(CGRect(x: 1, y: 0, width: w - 2, height: h)); c.fill(CGRect(x: 0, y: 1, width: w, height: h - 2))
             c.setFillColor(border.cgColor)
             c.fill(CGRect(x: 2, y: 1, width: w - 4, height: h - 2)); c.fill(CGRect(x: 1, y: 2, width: w - 2, height: h - 4))
-            c.setFillColor(CGColor(srgbRed: 0.08, green: 0.08, blue: 0.12, alpha: fill + 0.3))
+            c.setFillColor(CGColor(srgbRed: inner, green: inner, blue: inner * 1.3, alpha: min(1, fill + 0.3)))
             c.clear(CGRect(x: 3, y: 3, width: w - 6, height: h - 6))
             c.fill(CGRect(x: 3, y: 3, width: w - 6, height: h - 6))
         }
@@ -54,16 +54,16 @@ final class HUD {
         jetFill.color = SKColor(srgbRed: 0.35, green: 0.9, blue: 1, alpha: 1)
 
         // hotbar
-        let n = Weapons.all.count, slotW: CGFloat = 50, gap: CGFloat = 4
+        let n = Weapons.all.count, slotW: CGFloat = 58, gap: CGFloat = 4
         let total = CGFloat(n) * slotW + CGFloat(n - 1) * gap
         let x0 = size.width / 2 - total / 2
         for i in 0..<n {
-            let s = SKSpriteNode(texture: HUD.panelTexture(25, 25, border: SKColor(white: 0.45, alpha: 1)))
+            let s = SKSpriteNode(texture: HUD.panelTexture(29, 29, border: SKColor(white: 0.5, alpha: 1), fill: 0.7, inner: 0.2))
             s.size = CGSize(width: slotW, height: slotW)
             s.position = CGPoint(x: x0 + slotW / 2 + CGFloat(i) * (slotW + gap), y: 14 + slotW / 2)
             root.addChild(s); slots.append(s)
             let t = Weapons.texture(i)
-            let sc = min(40 / t.size().width, 2)
+            let sc: CGFloat = t.size().width * 2 <= slotW - 8 ? 2 : 1
             let ic = SKSpriteNode(texture: t, size: CGSize(width: t.size().width * sc, height: t.size().height * sc))
             ic.position = s.position + CGPoint(x: 0, y: -2); ic.zPosition = 2
             root.addChild(ic); icons.append(ic)
@@ -72,7 +72,7 @@ final class HUD {
             num.position = s.position + CGPoint(x: -slotW / 2 + 5, y: slotW / 2 - 4); num.zPosition = 3
             root.addChild(num); numbers.append(num)
         }
-        selector.texture = HUD.panelTexture(27, 27, border: SKColor(srgbRed: 0.35, green: 0.95, blue: 1, alpha: 1), fill: -0.3)
+        selector.texture = HUD.panelTexture(31, 31, border: SKColor(srgbRed: 0.35, green: 0.95, blue: 1, alpha: 1), fill: 0.7, inner: 0.28)
         selector.size = CGSize(width: slotW + 4, height: slotW + 4)
         selector.zPosition = 1
         root.addChild(selector)

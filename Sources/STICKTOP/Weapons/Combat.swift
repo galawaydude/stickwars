@@ -31,6 +31,12 @@ enum Art {
     static var rocket: SKTexture { Tex.pixels("rocket", ["..kkkkk..", "okrrsssk.", "ookrsssck", "okrrsssk.", "..kkkkk.."]) }
     static var plasma: SKTexture { Tex.pixels("plasma", [".cccc.", "cwwwwc", "cwwwwc", ".cccc."]) }
     static var grenade: SKTexture { Tex.pixels("grenade", ["..kk..", ".kyyk.", "kddddk", "kdgddk", "kddddk", "kdddek", ".kkkk."]) }
+    /// Blocky pixel starburst for explosion flashes (never a smooth circle).
+    static var blast: SKTexture {
+        Tex.pixels("blast", ["....y..y.....", "..y.yyyy..y..", "...yywwyyy...", ".yywwwwwwyy..", "..ywwwwwwwyy.",
+                             "yywwwwwwwwwy.", ".ywwwwwwwwwyy", "..yywwwwwwy..", ".yyywwwwwyyy.", "...yyywwyy...",
+                             "..y..yyyy.y..", ".....y..y....", "............."])
+    }
     static var flash: SKTexture { Tex.pixels("flash", ["..y....", ".yyw.y.", "yywwwyy", ".yyw.y.", "..y...."]) }
     static var crosshair: SKTexture {
         Tex.pixels("crosshair", ["....kkk....", "....kwk....", "....kwk....", "....kkk....", "kkkk...kkkk", "kwwk.w.kwwk",
@@ -175,7 +181,7 @@ extension GameScene {
             }
         }
         // Elements: big ones are hit at their first opaque pixel so bullets fly through holes.
-        var from = a
+        let from = a
         var ignored = 0
         var ign = (-1, -1, -1, -1)
         while ignored < 4 {

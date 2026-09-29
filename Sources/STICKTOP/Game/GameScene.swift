@@ -70,6 +70,10 @@ final class GameScene: SKScene {
 
     override init(size: CGSize) {
         level = Level(size: size)
+        // generate all static pixel art up front and pack it into one atlas
+        for i in 0..<Weapons.all.count { _ = Weapons.texture(i) }
+        _ = [Art.rocket, Art.plasma, Art.grenade, Art.flash, Art.blast, Art.crosshair, Art.medkit] + Art.portalFrames
+        Tex.packAtlas()
         hud = HUD(size: size)
         super.init(size: size)
         scaleMode = .fill
@@ -108,7 +112,7 @@ final class GameScene: SKScene {
         bounds.physicsBody = walls
         physicsRoot.addChild(bounds)
         debugLabel.anchorPoint = CGPoint(x: 0, y: 1)
-        debugLabel.position = CGPoint(x: 12, y: size.height - 120)
+        debugLabel.position = CGPoint(x: 14, y: size.height - 140)
         debugLabel.isHidden = true
         hudRoot.addChild(debugLabel)
         player = Fighter(id: 0, name: "YOU", color: SKColor(srgbRed: 0xF0 / 255, green: 0x7D / 255, blue: 0x2A / 255, alpha: 1), isPlayer: true)
@@ -296,7 +300,7 @@ final class GameScene: SKScene {
     }
 
     func debugText() -> String {
-        String(format: "FPS %.0f  FRAME %.2f MS  ELEMENTS %d  BODIES %d  PARTICLES %d  TILES %d  EXTRACT %.0f MS", fps, frameMs,
+        String(format: "FPS %.0f  UPDATE %.2f MS  ELEMENTS %d  BODIES %d  PARTICLES %d  TILES %d  EXTRACT %.0f MS", fps, frameMs,
                level.solidCount, debris.liveCount, particles.count, canvas?.lastFlushCount ?? 0, extractMs)
     }
 
@@ -346,16 +350,9 @@ final class GameScene: SKScene {
         if down { mouseDown = true; pendingFire = true } else { mouseDown = false; pendingRelease = true }
     }
 
-    override func keyDown(with e: NSEvent) { key(e.keyCode, down: true, isRepeat: e.isARepeat) }
-    override func keyUp(with e: NSEvent) { key(e.keyCode, down: false) }
-    override func flagsChanged(with e: NSEvent) { shiftDown = e.modifierFlags.contains(.shift) }
-    override func mouseMoved(with e: NSEvent) { mouse = e.location(in: self) }
-    override func mouseDragged(with e: NSEvent) { mouse = e.location(in: self) }
-    override func rightMouseDragged(with e: NSEvent) { mouse = e.location(in: self) }
-    override func mouseDown(with e: NSEvent) { mouse = e.location(in: self); mouseButton(true) }
-    override func mouseUp(with e: NSEvent) { mouseButton(false) }
-    override func rightMouseDown(with e: NSEvent) { pendingGrenade = true }
-    override func scrollWheel(with e: NSEvent) {
+    // Events arrive from GameView (not the SKView forwarding) so each is handled exactly once.
+    func grenadePressed() { pendingGrenade = true }
+    func scroll(_ e: NSEvent) {
         guard abs(e.scrollingDeltaY) > 0.5 || abs(e.deltaY) > 0.1 else { return }
         let n = Weapons.all.count
         let dir = (e.scrollingDeltaY != 0 ? e.scrollingDeltaY : e.deltaY) > 0 ? -1 : 1

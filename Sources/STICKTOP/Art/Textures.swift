@@ -4,6 +4,8 @@ import SpriteKit
 /// Procedural textures, generated once and cached by name. Main thread only.
 enum Tex {
     private static var cache: [String: SKTexture] = [:]
+    private static var pixelImages: [String: CGImage] = [:]
+    private static var atlas: SKTextureAtlas?
 
     static let palette: [Character: RGBA] = [
         "k": RGBA(18, 18, 26), "d": RGBA(52, 56, 70), "g": RGBA(92, 98, 116), "l": RGBA(150, 158, 176),
@@ -39,9 +41,26 @@ enum Tex {
                 px[i] = c.r; px[i + 1] = c.g; px[i + 2] = c.b; px[i + 3] = 255
             }
         }
-        let t = texture(image(px, w, h))
+        let img = image(px, w, h)
+        let t = texture(img)
         cache[name] = t
+        if atlas == nil { pixelImages[name] = img }
         return t
+    }
+
+    /// Packs every pixel sprite generated so far into one atlas so they batch into fewer draw calls.
+    static func packAtlas() {
+        guard atlas == nil, !pixelImages.isEmpty else { return }
+        var dict: [String: Any] = [:]
+        for (k, img) in pixelImages { dict[k] = NSImage(cgImage: img, size: NSSize(width: img.width, height: img.height)) }
+        let a = SKTextureAtlas(dictionary: dict)
+        for k in pixelImages.keys {
+            let t = a.textureNamed(k)
+            t.filteringMode = .nearest
+            cache[k] = t
+        }
+        atlas = a
+        pixelImages.removeAll()
     }
 
     /// Generic cached texture drawn with a CGContext (y up).

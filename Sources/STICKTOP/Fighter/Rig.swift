@@ -109,7 +109,7 @@ final class Rig {
                 t.shinB = t.thighB - 1.3 * max(0, -cos(runPhase + .pi))
                 t.lean = (backwards ? -0.08 : 0.18) * min(1, speed / Move.run)
             } else {
-                t.thighF = 0.14; t.shinF = 0.06; t.thighB = -0.14; t.shinB = -0.18; t.lean = 0.04
+                t.thighF = 0.26; t.shinF = 0.12; t.thighB = -0.26; t.shinB = -0.3; t.lean = 0.04
                 runPhase = 0
             }
         } else if f.wallDir != 0 && f.vel.y < 0 {

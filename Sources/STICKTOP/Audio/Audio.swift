@@ -50,6 +50,16 @@ final class Audio {
 
     func stopAll() { players.forEach { $0.stop() } }
 
+    /// Synthesizes every sound without playing anything; returns length and peak per sound (dev check).
+    func synthCheck() -> String {
+        Sound.allCases.map { snd in
+            let d = synth(snd)
+            let peak = d.reduce(0) { max($0, abs($1)) }
+            let bad = d.contains { !$0.isFinite }
+            return String(format: "%@ %.2fs peak %.2f%@", "\(snd)", Double(d.count) / sr, peak, bad ? " NAN" : "")
+        }.joined(separator: ", ")
+    }
+
     // MARK: synthesis
 
     private func buffer(_ data: [Float]) -> AVAudioPCMBuffer {
@@ -132,7 +142,7 @@ final class Audio {
         case .kill: return mix(sweep(0.12, 880, 880, decay: 10, wave: 1, gain: 0.2), sweep(0.35, 660, 220, decay: 6, wave: 1, gain: 0.2))
         case .pickup: return mix(sweep(0.08, 660, 660, decay: 20, wave: 1, gain: 0.2), sweep(0.16, 990, 1320, decay: 12, wave: 1, gain: 0.2))
         case .blip: return sweep(0.05, 900, 900, decay: 40, wave: 1, gain: 0.18)
-        case .reload: return mix(noise(0.04, cutoff: 0.9, decay: 90, gain: 0.5), sweep(0.25, 1800, 1800, decay: 200, gain: 0), shifted(noise(0.05, cutoff: 0.8, decay: 80, gain: 0.6), by: 0.18))
+        case .reload: return mix(noise(0.04, cutoff: 0.9, decay: 90, gain: 0.5), shifted(noise(0.05, cutoff: 0.8, decay: 80, gain: 0.6), by: 0.18))
         case .empty: return noise(0.03, cutoff: 0.9, decay: 120, gain: 0.5)
         case .grenade: return noise(0.18, cutoff: 0.15, decay: 16, gain: 0.5)
         case .bounce: return sweep(0.05, 500, 300, decay: 60, gain: 0.35)
