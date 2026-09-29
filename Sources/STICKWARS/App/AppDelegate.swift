@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import ServiceManagement
 import SpriteKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -18,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var prevApp: NSRunningApplication?
     private var cursorHidden = false
     private var playItem: NSMenuItem?
+    private var loginItem: NSMenuItem?
+    private var setup: SetupWindow?
 
     init(dev: Bool) { self.dev = dev }
 
@@ -40,14 +43,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if dev {
             harness = DevHarness(app: self)
         } else {
+            NSApp.applicationIconImage = AppIcon.nsImage
             buildMenu()
             hotKey = HotKey.optionShiftF { [weak self] in self?.toggle() }
-            // Ask now, while nothing covers the screen. Grants apply after relaunch.
-            if !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
-            if !AXIsProcessTrusted() {
-                let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                _ = AXIsProcessTrustedWithOptions(opts)
-            }
+            // First run, or Screen Recording still missing: the setup window walks through it
+            // (instead of surprise system prompts), while nothing covers the screen.
+            let d = UserDefaults.standard
+            if !SetupWindow.screenGranted || !d.bool(forKey: "setupSeen") { showSetup() }
+            if SetupWindow.screenGranted { d.set(true, forKey: "setupSeen") }
         }
     }
 
@@ -93,12 +96,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(i)
         }
         menu.addItem(.separator())
+        menu.addItem(withTitle: "Setup & Permissions…", action: #selector(menuSetup), keyEquivalent: "").target = self
+        let login = NSMenuItem(title: "Open at Login", action: #selector(menuLogin(_:)), keyEquivalent: "")
+        login.target = self
+        menu.addItem(login); loginItem = login
+        menu.delegate = self
         menu.addItem(withTitle: "Quit STICKWARS", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
         statusItem = item
     }
 
     @objc private func menuToggle() { toggle() }
+    @objc private func menuSetup() { showSetup() }
+    @objc private func menuLogin(_ s: NSMenuItem) {
+        do {
+            if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() } else { try SMAppService.mainApp.register() }
+        } catch { SMAppService.openSystemSettingsLoginItems() }
+    }
+
+    func showSetup() {
+        if setup == nil { setup = SetupWindow { [weak self] in self?.play() } }
+        setup?.show()
+    }
     @objc private func menuNewMatch() { scene.newMatch(); if !playing { play() } }
     @objc private func menuBots(_ s: NSMenuItem) {
         settings.bots = s.tag
@@ -126,7 +145,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func play() {
         guard !playing, !starting else { return }
-        guard CGPreflightScreenCaptureAccess() else { showPermissionAlert(); return }
+        guard SetupWindow.screenGranted else { showSetup(); return }
+        if setup?.isVisible == true { return }
         starting = true
         let front = NSWorkspace.shared.frontmostApplication
         prevApp = front?.processIdentifier == getpid() ? nil : front
@@ -138,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.start(image: img, appName: name, windows: windows, headless: false)
             } catch {
                 self.starting = false
-                self.showPermissionAlert()
+                self.showSetup()
             }
         }
     }
@@ -179,17 +199,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             prevApp?.activate()
         }
     }
+}
 
-    private func showPermissionAlert() {
-        NSApp.activate(ignoringOtherApps: true)
-        let a = NSAlert()
-        a.messageText = "STICKWARS needs Screen Recording permission"
-        a.informativeText = "STICKWARS turns a still picture of your screen into the level. It never saves or sends the picture anywhere.\n\nEnable STICKWARS under System Settings › Privacy & Security › Screen & System Audio Recording, then quit and reopen STICKWARS (macOS applies the grant after a relaunch)."
-        a.addButton(withTitle: "Open System Settings")
-        a.addButton(withTitle: "Cancel")
-        if a.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
-            NSWorkspace.shared.open(url)
-        }
-    }
+extension AppDelegate: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) { loginItem?.state = SMAppService.mainApp.status == .enabled ? .on : .off }
 }

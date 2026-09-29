@@ -6,21 +6,28 @@ the screen, and watch the pieces pile up. Esc or ⌥⇧F gives you your desktop 
 
 Native Swift + SpriteKit, no assets and no dependencies. macOS 14+, Apple Silicon, primary display.
 
-## Build and run
+## Install
 
 ```sh
-./build.sh                 # swift build -c release, assembles and ad hoc signs STICKWARS.app
-open STICKWARS.app          # menu-bar icon (figure.boxing)
+git clone https://github.com/galawaydude/stickwars.git
+cd stickwars
+./install.sh               # builds, copies to /Applications, opens it
 ```
 
+Needs macOS 14+ on Apple Silicon and the Xcode Command Line Tools (`xcode-select --install`).
+`./build.sh` alone builds `STICKWARS.app` in place without installing.
+
+On first launch a setup window walks through permissions, with live status for each:
+
+- **Screen Recording** (required): takes one still picture of the screen to build the level. macOS applies
+  it after a restart of the app, so the window offers a **Relaunch** button once you've turned it on.
+- **Accessibility** (recommended): exact element positions. Takes effect immediately. Without it, elements
+  come from pixel detection alone.
+
+The same window has **Open at login** and **Play Now**, and is always available from the menu-bar icon
+(**Setup & Permissions…**). The icon is drawn in code at build time; the repo has no image files.
 `build.sh` signs with a pinned designated requirement (`identifier "com.galawaydude.stickwars"`), so the
-Screen Recording and Accessibility grants survive rebuilds.
-
-On first launch macOS asks for:
-
-- **Screen Recording** (required). The grant only applies after STICKWARS is quit and reopened.
-- **Accessibility** (optional, recommended). Used only to read element frames for exact rectangles.
-  Without it, elements come from pixel detection alone.
+grants survive rebuilds and reinstalls.
 
 ## Controls
 
