@@ -48,7 +48,8 @@ extension GameScene {
         switch director.shot {
         case 0:
             cinema.baseZoom = 1.08
-            cinema.baseFocus = (heroP + CGPoint(x: size.width / 2, y: size.height / 2)) * 0.5
+            let anchor = stage.map { CGPoint(x: $0.midX, y: $0.midY) } ?? CGPoint(x: size.width / 2, y: size.height / 2)
+            cinema.baseFocus = (heroP + anchor) * 0.5
         case 2:
             let mid = nearest.map { (heroP + $0.center) * 0.5 } ?? heroP
             cinema.baseZoom = 1.5

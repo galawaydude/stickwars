@@ -85,6 +85,10 @@ final class Brain {
             goal = T.pos
             if hasLOS && abs(dist - pref) < 140 { goal = f.pos } // good spot: hold and strafe
         }
+        // demo hero holds the featured window; the fight comes to it
+        if stylish, let st = s.stage?.insetBy(dx: 20, dy: 10), !st.contains(goal) {
+            goal = CGPoint(x: clamp(goal.x, st.minX, st.maxX), y: clamp(goal.y, st.minY, st.maxY))
+        }
 
         // 3. Navigate along the path.
         var wantMove = false

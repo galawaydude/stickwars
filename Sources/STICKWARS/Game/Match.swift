@@ -151,7 +151,7 @@ extension GameScene {
             // portal opens 0.6 s before the respawn
             if simTime >= f.respawnAt - 0.6, !extracting {
                 if f.spawnPoint == nil {
-                    f.spawnPoint = spawnPoint()
+                    f.spawnPoint = spawnPoint(inStage: demo && stage != nil && (f.isPlayer || rng.chance(0.6)))
                     portal.position = f.spawnPoint!
                     portal.isHidden = false
                     portal.setScale(0.1)

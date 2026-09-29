@@ -79,6 +79,10 @@ final class DevHarness {
                     // later 'play's reuse this snapshot, so several takes can be shot from one capture
                     fakeWindows = wins
                     desk = img
+                    // feature the Spotify window if it's on screen
+                    if let sp = wins.first(where: { $0.owner.contains("Spotify") && $0.layer == 0 }) {
+                        scene.stage = CGRect(x: sp.bounds.minX, y: scene.size.height - sp.bounds.maxY, width: sp.bounds.width, height: sp.bounds.height)
+                    }
                 } catch { return "capture failed: \(error)" }
             }
             let t0 = now()
@@ -96,7 +100,8 @@ final class DevHarness {
         case "record":
             let path = a.first(where: { $0.hasPrefix("/") }) ?? "/tmp/stickwars-demo.mp4"
             let secs = Double(a.first(where: { Double($0) != nil }) ?? "30") ?? 30
-            return await record(path, seconds: secs)
+            let r = await record(path, seconds: secs)
+            return r + (scene.stage.map { String(format: " stage %.0f,%.0f %.0fx%.0f", $0.minX, $0.minY, $0.width, $0.height) } ?? " no stage")
         case "pause":
             app.pause(); return "paused"
         case "step":

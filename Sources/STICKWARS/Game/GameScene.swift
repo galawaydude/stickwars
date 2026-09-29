@@ -62,6 +62,8 @@ final class GameScene: SKScene {
     /// Dev harness playing on a real screenshot: use Accessibility too, like the real game.
     var realCaptureInDev = false
     var director = DirectorState()
+    /// Demo reels: the window the action should stay around (scene coords).
+    var stage: CGRect?
     var fps = 0.0
     private var fpsFrames = 0, fpsStart = 0.0
 
@@ -197,11 +199,13 @@ final class GameScene: SKScene {
     }
 
     /// Random open spot on top of some element (or the floor).
-    func spawnPoint() -> CGPoint {
-        for _ in 0..<60 {
+    func spawnPoint(inStage: Bool = false) -> CGPoint {
+        for k in 0..<120 {
             guard level.elements.count > 0 else { break }
             let e = level.elements[rng.int(level.elements.count)]
             guard e.state == .solid, e.rect.width >= 20, e.rect.maxY > 60, e.rect.maxY < size.height - 90 else { continue }
+            // demo reels: keep spawns on the featured window
+            if inStage, let st = stage, k < 100, !st.contains(CGPoint(x: e.rect.midX, y: e.rect.maxY)) { continue }
             let p = CGPoint(x: clamp(e.rect.minX + rng.range(8, max(9, e.rect.width - 8)), 20, size.width - 20), y: e.rect.maxY)
             var blocked = false
             level.query(CGRect(x: p.x - Move.halfW, y: p.y + 2, width: Move.halfW * 2, height: Move.height)) { i in
