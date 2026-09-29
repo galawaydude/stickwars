@@ -59,6 +59,8 @@ final class GameScene: SKScene {
     /// Demo reel mode: the player is on autopilot and the crosshair follows its aim.
     var demo = false
     var botOverride: Int?
+    /// Dev harness playing on a real screenshot: use Accessibility too, like the real game.
+    var realCaptureInDev = false
     var fps = 0.0
     private var fpsFrames = 0, fpsStart = 0.0
 
@@ -176,7 +178,7 @@ final class GameScene: SKScene {
         extracting = true
         extractGen += 1
         let gen = extractGen, sz = size
-        let useAX = !(app?.dev ?? false)
+        let useAX = !(app?.dev ?? false) || realCaptureInDev
         DispatchQueue.global(qos: .userInteractive).async { [weak self] in
             let ex = Extractor.run(image: image, windows: windows, screen: sz, useAX: useAX)
             DispatchQueue.main.async {

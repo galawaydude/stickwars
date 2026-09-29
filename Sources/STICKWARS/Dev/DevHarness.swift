@@ -12,6 +12,7 @@ final class DevHarness {
     private var sources: [DispatchSourceSignal] = []
     private var fake: CGImage?
     private var fakeWindows: [WindowInfo] = []
+    private var desk: CGImage?      // last real screenshot (intro card of a demo reel)
     private var renderer: SKRenderer?
     private var vt = now()
     private var busy = false
@@ -65,9 +66,18 @@ final class DevHarness {
             if let img = fake {
                 app.start(image: img, appName: "Safari", windows: fakeWindows, headless: true)
             } else {
+                // Real screen (needs the installed app's Screen Recording grant). Optional delay so
+                // the user can bring the apps they want to the front first.
+                if let d = Double(a.first ?? "") { try? await Task.sleep(nanoseconds: UInt64(d * 1e9)) }
                 do {
+                    let front = NSWorkspace.shared.frontmostApplication?.localizedName ?? "Desktop"
+                    let wins = ScreenCapture.windowList()
                     let img = try await ScreenCapture.capture()
-                    app.start(image: img, appName: "Screen", windows: ScreenCapture.windowList(), headless: true)
+                    fake = img
+                    scene.realCaptureInDev = true
+                    app.start(image: img, appName: front, windows: wins, headless: true)
+                    fake = nil
+                    desk = img
                 } catch { return "capture failed: \(error)" }
             }
             let t0 = now()
@@ -148,7 +158,7 @@ final class DevHarness {
         if renderer == nil { renderer = SKRenderer(device: MTLCreateSystemDefaultDevice()!); renderer!.scene = scene }
         scene.isPaused = false
         let t0 = now()
-        let desk = fake
+        let desk = fake ?? self.desk
         // Intro: the untouched desktop, then the hotkey pops in.
         for i in 0..<Int(1.8 * Double(fps)) {
             let t = CGFloat(i) / CGFloat(fps)
