@@ -91,26 +91,3 @@ After that it lives in the menu bar (the little boxing guy). Press ⌥⇧F anywh
 | Esc or ⌥⇧F | pause and get your desktop back |
 
 The menu bar icon lets you change the number of bots (0 to 5) and the difficulty, or mute it.
-
-<details>
-<summary>for the nerds</summary>
-
-It's plain Swift and SpriteKit with no dependencies. The screen is captured with ScreenCaptureKit and
-turned into platforms by combining the accessibility tree with some edge detection on the pixels. The
-debris is SpriteKit physics, and the stick figures are procedurally animated. A busy fight runs at about
-1 ms a frame.
-
-`./build.sh` builds the app without installing it. There's a headless test harness (`./dev.sh`) that
-drives the whole game without ever showing a window, and it's what made the video:
-
-```sh
-./dev.sh start && ./dev.sh "fake desktop" play "demo 5" "step 60" "record 36 $HOME/Desktop/take.mp4"
-./dev.sh start-installed && ./dev.sh "play 2" "demo 5" "step 60" "record 36 $HOME/Desktop/real.mp4"   # your real screen
-STICKWARS.app/Contents/MacOS/STICKWARS --selfcheck
-```
-
-Other harness commands: `fake [dark|desktop]`, `play`, `pause`, `step N`, `perf N`, `perfblast N`,
-`snap [lines] [crop x y w h]`, `state`, `give NAME`, `shoot`, `blast`, `grenade`, `bots`, `killbot`,
-`armor`, `knife`.
-
-</details>
