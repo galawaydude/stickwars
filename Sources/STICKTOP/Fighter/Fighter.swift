@@ -58,6 +58,7 @@ final class Fighter {
     // one-frame events for FX/sound
     var evJump = false, evLand: CGFloat = 0, evWallJump = false
     var hitFlash: CGFloat = 0
+    var muzzle = CGPoint.zero
     var recoilKick: CGFloat = 0
 
     let node = SKNode()

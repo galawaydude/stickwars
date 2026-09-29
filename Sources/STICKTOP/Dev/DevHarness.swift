@@ -75,6 +75,13 @@ final class DevHarness {
         case "perf":
             let n = Int(num(a, 0, 240))
             return perf(n)
+        case "perfblast":
+            // perf with an explosion every 30 frames and SMG fire from the player
+            let n = Int(num(a, 0, 240))
+            return perf(n) { [unowned self] k in
+                if k % 30 == 0 { _ = self.scene.devCommand("blast", ["\(Int.random(in: 100...1400))", "\(Int.random(in: 100...900))", "70"]) }
+                if k % 6 == 0 { _ = self.scene.devCommand("shoot", ["\(Int.random(in: 0...1500))", "\(Int.random(in: 0...900))", "\(Int.random(in: 0...1500))", "\(Int.random(in: 0...900))"]) }
+            }
         case "snap":
             let lines = a.contains("lines")
             let path = a.first(where: { $0.hasPrefix("/") }) ?? "/tmp/sticktop-snap.png"
@@ -103,7 +110,7 @@ final class DevHarness {
         }
     }
 
-    private func perf(_ n: Int) -> String {
+    private func perf(_ n: Int, each: ((Int) -> Void)? = nil) -> String {
         step(1)
         guard let dev = MTLCreateSystemDefaultDevice(), let q = dev.makeCommandQueue() else { return "no metal" }
         let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: Int(scene.size.width * 2),
@@ -111,8 +118,10 @@ final class DevHarness {
         desc.usage = [.renderTarget]
         let tex = dev.makeTexture(descriptor: desc)!
         var total = 0.0, worst = 0.0, upd = 0.0
-        for _ in 0..<n {
+        var times: [Double] = []
+        for k in 0..<n {
             let t0 = now()
+            each?(k)
             vt += 1.0 / 120
             renderer!.update(atTime: vt)
             let t1 = now()
@@ -124,10 +133,12 @@ final class DevHarness {
             renderer!.render(withViewport: CGRect(x: 0, y: 0, width: tex.width, height: tex.height), commandBuffer: cb, renderPassDescriptor: rp)
             cb.commit()
             let dt = (now() - t0) * 1000
-            total += dt; worst = max(worst, dt); upd += (t1 - t0) * 1000
+            total += dt; worst = max(worst, dt); upd += (t1 - t0) * 1000; times.append(dt)
             cb.waitUntilCompleted()
         }
-        return String(format: "perf %d frames: avg %.3f ms (update %.3f ms) worst %.3f ms main-thread CPU", n, total / Double(n), upd / Double(n), worst)
+        times.sort()
+        let p95 = times.isEmpty ? 0 : times[min(times.count - 1, times.count * 95 / 100)]
+        return String(format: "perf %d frames: avg %.3f ms (update %.3f ms) p95 %.3f worst %.3f ms main-thread CPU", n, total / Double(n), upd / Double(n), p95, worst)
     }
 
     private func snap(_ path: String, lines: Bool) -> String {

@@ -57,6 +57,12 @@ final class Canvas {
         return (x0, y0, x1, y1)
     }
 
+    /// The scene rect exactly covered by pxRect(r) (where a crop of r should be drawn).
+    func aligned(_ r: CGRect) -> CGRect {
+        let (x0, y0, x1, y1) = pxRect(r)
+        return CGRect(x: CGFloat(x0) / scale, y: size.height - CGFloat(y1) / scale, width: CGFloat(x1 - x0) / scale, height: CGFloat(y1 - y0) / scale)
+    }
+
     @inline(__always) func toPx(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x * scale, y: (size.height - p.y) * scale) }
 
     func markDirty(_ x0: Int, _ y0: Int, _ x1: Int, _ y1: Int) {
@@ -228,6 +234,36 @@ final class Canvas {
         markDirty(bx0, y0, bx1, y1)
     }
 
+    /// Blocky dithered burn mark around c (2-pt blocks, 4 shade levels) over existing pixels.
+    func scorch(_ c: CGPoint, radius r: CGFloat, seed: UInt64) {
+        let cp = toPx(c), rp = r * scale
+        let x0 = clamp(Int(cp.x - rp), 0, pw), x1 = clamp(Int(cp.x + rp) + 1, 0, pw)
+        let y0 = clamp(Int(cp.y - rp), 0, ph), y1 = clamp(Int(cp.y + rp) + 1, 0, ph)
+        guard x1 > x0, y1 > y0 else { return }
+        let block = max(1, Int(2 * scale))
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let i = (y * pw + x) * 4
+                let da = UInt32(buf[i + 3]); if da == 0 { continue }
+                let bx = (x / block) * block + block / 2, by = (y / block) * block + block / 2
+                let dx = CGFloat(bx) - cp.x, dy = CGFloat(by) - cp.y
+                let d = (dx * dx + dy * dy).squareRoot() / rp
+                if d >= 1 { continue }
+                var h = UInt64(bx / block) &* 73856093 ^ UInt64(by / block) &* 19349663 ^ seed
+                h = (h ^ (h >> 13)) &* 0x5bd1e995
+                let noise = CGFloat(h & 1023) / 1023
+                var s = (1 - d) * 1.5 + (noise - 0.5) * 0.7
+                s = (clamp(s, 0, 1) * 4).rounded(.down) / 4 * 0.8
+                if s <= 0 { continue }
+                let a = UInt32(s * 255), ia = 255 - a
+                buf[i] = UInt8((UInt32(buf[i]) * ia + 30 * da / 255 * a) / 255)
+                buf[i + 1] = UInt8((UInt32(buf[i + 1]) * ia + 22 * da / 255 * a) / 255)
+                buf[i + 2] = UInt8((UInt32(buf[i + 2]) * ia + 18 * da / 255 * a) / 255)
+            }
+        }
+        markDirty(x0, y0, x1, y1)
+    }
+
     /// Dark 1-2 px polyline (cracks), only over existing pixels.
     func drawPolyline(_ pts: [CGPoint], _ c: RGBA, alpha: CGFloat, width: Int = 2) {
         guard pts.count >= 2 else { return }
@@ -309,9 +345,9 @@ final class Canvas {
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: sRGB,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         let path = CGMutablePath()
-        let sx = CGFloat(w) / b.width, sy = CGFloat(h) / b.height
+        let ab = aligned(b)
         for (i, p) in poly.enumerated() {
-            let q = CGPoint(x: (p.x - b.minX) * sx, y: (p.y - b.minY) * sy)
+            let q = CGPoint(x: (p.x - ab.minX) * scale, y: (p.y - ab.minY) * scale)
             if i == 0 { path.move(to: q) } else { path.addLine(to: q) }
         }
         path.closeSubpath()

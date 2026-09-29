@@ -18,6 +18,20 @@ final class GameScene: SKScene {
     private var extractGen = 0
     var windows: [WindowInfo] = []
 
+    // Dynamic systems
+    let physicsRoot = SKNode()     // static bodies + debris; not shaken so physics stays consistent
+    let debris = DebrisSystem()
+    let statics = StaticBodies()
+    let particles = Particles()
+    let fx = FXPool()
+    let projectileRoot = SKNode()
+    var projectiles: [Projectile] = []
+    var projectilePool: [SKSpriteNode] = []
+    let crosshair = SKSpriteNode(texture: Art.crosshair)
+    var shakeAmp: CGFloat = 0
+    var hitStopLeft = 0.0
+    var scratch: [Int] = []
+
     // Fighters
     var fighters: [Fighter] = []
     var player: Fighter!
@@ -56,7 +70,32 @@ final class GameScene: SKScene {
         canvasRoot.zPosition = 0
         world.zPosition = 10
         hudRoot.zPosition = 1000
-        addChild(backdrop); addChild(canvasRoot); addChild(world); addChild(hudRoot)
+        physicsRoot.zPosition = 5
+        addChild(backdrop); addChild(canvasRoot); addChild(physicsRoot); addChild(world); addChild(hudRoot)
+        physicsRoot.addChild(statics.root)
+        physicsRoot.addChild(debris.root)
+        particles.node.zPosition = 40
+        fx.node.zPosition = 45
+        projectileRoot.zPosition = 30
+        world.addChild(particles.node); world.addChild(fx.node); world.addChild(projectileRoot)
+        crosshair.size = CGSize(width: 22, height: 22)
+        crosshair.zPosition = 500
+        hudRoot.addChild(crosshair)
+        physicsWorld.gravity = CGVector(dx: 0, dy: -14)
+        physicsWorld.speed = 1
+        // Thick floor and side walls so fast debris can't tunnel out.
+        let bounds = SKNode()
+        let t: CGFloat = 400, W = size.width, H = size.height
+        let walls = SKPhysicsBody(bodies: [
+            SKPhysicsBody(rectangleOf: CGSize(width: W + 2 * t, height: t), center: CGPoint(x: W / 2, y: -t / 2)),
+            SKPhysicsBody(rectangleOf: CGSize(width: t, height: H * 4), center: CGPoint(x: -t / 2, y: H * 2)),
+            SKPhysicsBody(rectangleOf: CGSize(width: t, height: H * 4), center: CGPoint(x: W + t / 2, y: H * 2)),
+        ])
+        walls.isDynamic = false
+        walls.categoryBitMask = PhysCat.edge
+        walls.friction = 0.8
+        bounds.physicsBody = walls
+        physicsRoot.addChild(bounds)
         debugLabel.anchorPoint = CGPoint(x: 0, y: 1)
         debugLabel.position = CGPoint(x: 12, y: size.height - 120)
         debugLabel.isHidden = true
@@ -83,8 +122,14 @@ final class GameScene: SKScene {
         let c = Canvas(image: image, pointSize: size)
         canvas = c
         canvasRoot.addChild(c.node)
+        statics.clear()
+        debris.clear()
+        particles.clear()
+        fx.clear()
+        clearProjectiles()
         level.reset([])
         lastTime = 0
+        shakeAmp = 0
         for f in fighters { f.vel = .zero }
         // Extraction off the main thread; the level becomes solid when it lands.
         extracting = true
@@ -151,6 +196,11 @@ final class GameScene: SKScene {
         var dt = lastTime == 0 ? fixedDT : currentTime - lastTime
         lastTime = currentTime
         dt = clamp(dt, 0, 0.1)
+        if hitStopLeft > 0 {
+            hitStopLeft -= dt
+            physicsWorld.speed = 0
+            dt = 0
+        } else if physicsWorld.speed == 0 { physicsWorld.speed = 1 }
         acc += dt
         var steps = 0
         while acc >= fixedDT - 1e-6, steps < 8 {
@@ -167,15 +217,29 @@ final class GameScene: SKScene {
     }
 
     func fixedStep(_ dt: Double) {
-        simTime += dt
         guard !extracting else { return }
+        simTime += dt
         readPlayerInput()
         let fdt = CGFloat(dt)
+        debris.collectPlatforms(into: &platforms)
         platforms.withUnsafeBufferPointer { plat in
             for f in fighters where f.alive {
                 f.step(fdt, level: level, extra: plat, bounds: size)
+                if f.evLand > 500 {
+                    particles.burst(f.pos, n: 6, speed: 120, life: 0.35, color: SKColor(white: 0.85, alpha: 1), size: 2, gravity: 200,
+                                    dir: CGPoint(x: 0, y: 1), cone: 1.4)
+                    if f.isPlayer { Audio.shared.play(.land, volume: 0.4, pan: pan(f.pos)) }
+                }
+                if f.evJump && f.isPlayer { Audio.shared.play(.jump, volume: 0.3, pan: pan(f.pos)) }
+                if f.jetting && rng.chance(0.6) {
+                    particles.emit(f.pos.x - f.facing * 4, f.pos.y + 34, vx: rng.range(-30, 30), vy: -rng.range(200, 320), life: 0.25,
+                                   color: rng.chance(0.5) ? SKColor(srgbRed: 0.4, green: 0.9, blue: 1, alpha: 1) : .orange, size: 2, gravity: 0)
+                }
             }
         }
+        for f in fighters where f.alive { updateWeapons(f, dt) }
+        updateProjectiles(fdt)
+        updateMatch(dt)
         for f in fighters { f.input.clearEdges() }
     }
 
@@ -185,8 +249,21 @@ final class GameScene: SKScene {
             f.node.position = CGPoint(x: f.pos.x.rounded(), y: f.pos.y.rounded())
             f.hitFlash = max(0, f.hitFlash - fdt)
             f.recoilKick = max(0, f.recoilKick - fdt * 6)
-            f.rig.update(f, dt: fdt)
+            f.muzzle = f.rig.update(f, dt: fdt)
+            if f.alive { debris.nudge(f.bodyRect, vx: f.vel.x) }
         }
+        particles.update(fdt)
+        fx.update(fdt)
+        debris.update(time: simTime, dt: fdt)
+        for i in level.removed { debris.wake(near: level.elements[i].rect) }
+        statics.sync(level)
+        // Screen shake in whole points, on the world layer only.
+        if shakeAmp > 0.5 {
+            world.position = CGPoint(x: (rng.range(-1, 1) * shakeAmp).rounded(), y: (rng.range(-1, 1) * shakeAmp).rounded())
+            shakeAmp *= CGFloat(exp(-12 * dt))
+        } else if world.position != .zero { world.position = .zero; shakeAmp = 0 }
+        crosshair.position = CGPoint(x: mouse.x.rounded(), y: mouse.y.rounded())
+        updateHUD(dt)
         if showDebug {
             debugTimer -= dt
             if debugTimer <= 0 {
@@ -197,8 +274,8 @@ final class GameScene: SKScene {
     }
 
     func debugText() -> String {
-        String(format: "FPS %.0f  FRAME %.2f MS  ELEMENTS %d  TILES %d  EXTRACT %.0f MS", fps, frameMs, level.solidCount,
-               canvas?.lastFlushCount ?? 0, extractMs)
+        String(format: "FPS %.0f  FRAME %.2f MS  ELEMENTS %d  BODIES %d  PARTICLES %d  TILES %d  EXTRACT %.0f MS", fps, frameMs,
+               level.solidCount, debris.liveCount, particles.count, canvas?.lastFlushCount ?? 0, extractMs)
     }
 
     // MARK: input
