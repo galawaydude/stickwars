@@ -1,92 +1,116 @@
-# STICKWARS
+<p align="center"><img src="docs/icon.png" width="128" alt="STICKWARS icon"></p>
 
-Press ⌥⇧F on any app. The screen freezes into a level: every word, icon, button and title bar is solid.
-Fight stick figures on it, shoot letters out one at a time, blow craters that reveal a pixel city behind
-the screen, and watch the pieces pile up. Esc or ⌥⇧F gives you your desktop back, untouched.
+<h1 align="center">STICKWARS</h1>
 
-Native Swift + SpriteKit, no assets and no dependencies. macOS 14+, Apple Silicon, primary display.
+<p align="center"><img src="docs/demo.gif" alt="stick figures fighting on top of Spotify and X"></p>
 
-## Install
+<p align="center"><b><a href="https://github.com/galawaydude/stickwars/releases/download/v1.0/stickwars-gameplay.mp4">watch the full video (with sound)</a></b></p>
+
+I always thought Alan Becker's stick figure animations were pretty cool. You know the ones, where the
+stick guy crawls out of the screen and starts wrecking the desktop. I wanted to see if Opus 5.5 could help
+me build something like that, and it kind of did.
+
+You press ⌥⇧F on whatever you have open. Your screen freezes and turns into the level. Every word,
+button, icon and title bar is something you can stand on, and you're dropped in with a bunch of stick
+figure bots and way too many guns. Shoot the letters out one by one, blow holes in the screen, throw a
+black hole at someone's tweet. Press Esc and you get your desktop back like nothing happened.
+
+It never touches your actual apps. It just takes one screenshot and fights on top of that.
+
+## what it looks like
+
+That's my real screen, Spotify sitting on top of X, about 9 seconds in. The letters are getting shot out
+of the playlist names and the purple holes are where the screen got blown open, you can see the pixel
+city behind it:
+
+![fighting on spotify](docs/shot-9.jpg)
+
+The slow-mo kicks in whenever you get a kill, the camera zooms in and the letterbox bars slide in:
+
+![slow mo kill](docs/shot-33.jpg)
+
+Everything that breaks off is a real physics object, so by the end there's a huge pile of words,
+Follow buttons and Dock icons at the bottom of the screen:
+
+![the pile](docs/shot-24.jpg)
+
+![more chaos](docs/shot-16.jpg)
+
+And it works on anything. This one's a made-up desktop with a code editor, a blog post and a chat app:
+
+![fake desktop](docs/fake-desktop.jpg)
+
+## stuff in it
+
+- 10 guns: pistol, SMG, shotgun, rocket launcher, plasma rifle, charged blaster, a laser that slices a
+  whole row of letters, a **black hole gun** that sucks in words, debris and players before collapsing,
+  a **saw launcher** that bounces around cutting through text, and a **lightning gun** that chains
+  between people. Plus grenades and a knife.
+- Armour you can pick up (you can actually see the vest and helmet on the guy), health packs.
+- Double jumps are front flips, wall jumps, a jetpack, dropping through lines of text.
+- Deaths are ragdolls. They fly off and pile up with everything else.
+- Bots that path-find across the screen, pick weapons by range, go for health when they're hurt.
+- Free for all, first to 10 kills.
+- All the art (guns, icon, the city behind the screen) is drawn in code, and all the sounds are
+  synthesized. There are no image or audio files in the game.
+
+## install
+
+You need a Mac with Apple Silicon on macOS 14 or newer, plus the command line tools
+(`xcode-select --install`).
 
 ```sh
 git clone https://github.com/galawaydude/stickwars.git
 cd stickwars
-./install.sh               # builds, copies to /Applications, opens it
+./install.sh
 ```
 
-Needs macOS 14+ on Apple Silicon and the Xcode Command Line Tools (`xcode-select --install`).
-`./build.sh` alone builds `STICKWARS.app` in place without installing.
+That builds it, puts it in /Applications and opens it. A setup window pops up asking for two
+permissions:
 
-On first launch a setup window walks through permissions, with live status for each:
+- **Screen Recording** is the one it really needs, that's how it grabs the picture of your screen. macOS
+  only applies it after the app restarts, so hit **Relaunch** in the setup window after turning it on.
+- **Accessibility** is optional. It lets the game know exactly where the buttons and text are so the
+  stick guys stand on them perfectly. Without it the game just figures that out from the pixels.
 
-- **Screen Recording** (required): takes one still picture of the screen to build the level. macOS applies
-  it after a restart of the app, so the window offers a **Relaunch** button once you've turned it on.
-- **Accessibility** (recommended): exact element positions. Takes effect immediately. Without it, elements
-  come from pixel detection alone.
+After that it lives in the menu bar (the little boxing guy). Press ⌥⇧F anywhere to play.
 
-The same window has **Open at login** and **Play Now**, and is always available from the menu-bar icon
-(**Setup & Permissions…**). The icon is drawn in code at build time; the repo has no image files.
-`build.sh` signs with a pinned designated requirement (`identifier "com.galawaydude.stickwars"`), so the
-grants survive rebuilds and reinstalls.
+## controls
 
-## Controls
-
-| Key | Action |
+| key | what it does |
 | --- | --- |
 | A / D | move |
-| W / Space | jump (double jump, wall jump) |
-| S | drop through a ledge, fast fall |
+| W or Space | jump, press again in the air to flip |
+| S | drop through a line of text |
 | Shift | jetpack |
-| Mouse, left click | aim, fire (hold for automatic weapons, hold and release to charge the blaster) |
-| Right click | grenade (3, recharging) |
-| 1–9, 0, scroll | pistol, SMG, shotgun, rocket, plasma, blaster, laser, black hole, saw, lightning |
-| F (or V) | knife slash |
+| mouse | aim and shoot (hold to keep firing, hold and let go to charge the blaster) |
+| right click | grenade |
+| F | knife |
+| 1 to 0, or scroll | switch guns |
 | R | reload |
-| F3 | debug overlay (FPS, update ms, elements, bodies, particles, dirty tiles) |
-| Esc, ⌥⇧F | pause and hide |
+| Esc or ⌥⇧F | pause and get your desktop back |
 
-Health and armour pickups spawn around the level: armour (vest and helmet, shown on the fighter)
-soaks most damage until it breaks. The black hole gun opens a singularity that drags in letters,
-debris and fighters before collapsing; the saw launcher ricochets and cuts through text; the lightning
-gun chains between enemies and letters. All weapon and gear art is SVG path data rendered in code.
+The menu bar icon lets you change the number of bots (0 to 5) and the difficulty, or mute it.
 
-The menu has Play/Pause, New Match, Bots (0–5), Difficulty and Mute.
+<details>
+<summary>for the nerds</summary>
 
-## Dev harness (headless, never shows the window)
+It's plain Swift and SpriteKit with no dependencies. The screen is captured with ScreenCaptureKit and
+turned into platforms by combining the accessibility tree with some edge detection on the pixels. The
+debris is SpriteKit physics, and the stick figures are procedurally animated. A busy fight runs at about
+1 ms a frame.
 
-```sh
-./dev.sh start                                   # runs STICKWARS.app --dev (no menu icon, no prompts)
-./dev.sh fake play "step 600" state "snap lines" # synthetic page, simulate 5 s, dump state, PNG with ledges
-./dev.sh "give rocket" "shoot 100 500 400 300" "blast 700 300 70" "perfblast 600" bots
-./dev.sh stop
-STICKWARS.app/Contents/MacOS/STICKWARS --selfcheck # extraction, one-way collision, fracture
-```
-
-Demo reel (fake three-window desktop, player on autopilot vs 5 bots, 1080p60 MP4 with synthesized
-soundtrack; needs ffmpeg for the audio mux):
+`./build.sh` builds the app without installing it. There's a headless test harness (`./dev.sh`) that
+drives the whole game without ever showing a window, and it's what made the video:
 
 ```sh
-./dev.sh start && ./dev.sh "fake desktop" play "demo 5" "step 60" "record 36 $HOME/Desktop/stickwars-gameplay.mp4"
+./dev.sh start && ./dev.sh "fake desktop" play "demo 5" "step 60" "record 36 $HOME/Desktop/take.mp4"
+./dev.sh start-installed && ./dev.sh "play 2" "demo 5" "step 60" "record 36 $HOME/Desktop/real.mp4"   # your real screen
+STICKWARS.app/Contents/MacOS/STICKWARS --selfcheck
 ```
 
-Commands: `fake [dark|desktop]`, `demo N`, `record SECONDS /path.mp4`, `play`, `pause`, `step N`, `perf N`, `perfblast N`, `snap [lines] [crop x y w h] [/path.png]`,
-`state`, `key CODE down|up`, `mouse X Y`, `click down|up`, `tp X Y`, `give N|NAME`, `shoot X1 Y1 X2 Y2`,
-`blast X Y R`, `grenade X Y VX VY`, `elements`, `bots`, `synth`. Results go to `/tmp/stickwars-out.txt`.
-Stepping drives `scene.update` and SpriteKit physics through `SKRenderer`, so it works with the display asleep.
+Other harness commands: `fake [dark|desktop]`, `play`, `pause`, `step N`, `perf N`, `perfblast N`,
+`snap [lines] [crop x y w h]`, `state`, `give NAME`, `shoot`, `blast`, `grenade`, `bots`, `killbot`,
+`armor`, `knife`.
 
-## Layout
-
-| Folder | What |
-| --- | --- |
-| App | menu, hotkey, permissions, window, play/pause |
-| Capture | ScreenCaptureKit snapshot, CGWindowList |
-| Elements | pixel detector, AX scanner, merge into elements |
-| Level | elements + spatial hash, raycast |
-| Canvas | tiled editable snapshot with dirty-tile uploads |
-| Destruction | letter knock-out, carving, crumbling, explosions, radial fracture |
-| Physics | debris rigid bodies (freeze/wake), static element bodies |
-| Fighter | platformer controller, procedural rig |
-| Weapons | weapon table, firing, hitscan, projectiles, damage |
-| AI | ledge nav graph + A*, bot brain |
-| Game | scene loop, match flow, dev hooks |
-| FX, HUD, Art, Audio, Dev | particles, HUD, procedural textures and font, synthesized sound, harness |
+</details>
