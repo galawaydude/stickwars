@@ -20,6 +20,6 @@ stop)
     printf '%s\n' "$@" > /tmp/stickwars-cmd.txt
     rm -f $OUT
     kill -USR1 "$(cat $PIDFILE)"
-    for _ in $(seq 600); do grep -q '^DONE' $OUT 2>/dev/null && break; sleep 0.05; done
+    for _ in $(seq 12000); do grep -q '^DONE' $OUT 2>/dev/null && break; sleep 0.05; done
     cat $OUT ;;
 esac

@@ -56,6 +56,9 @@ final class GameScene: SKScene {
     var simTime = 0.0
     var frameMs = 0.0
     var renderedFrames = 0
+    /// Demo reel mode: the player is on autopilot and the crosshair follows its aim.
+    var demo = false
+    var botOverride: Int?
     var fps = 0.0
     private var fpsFrames = 0, fpsStart = 0.0
 
@@ -235,7 +238,7 @@ final class GameScene: SKScene {
     override func update(_ currentTime: TimeInterval) {
         let t0 = now()
         renderedFrames += 1
-        if renderedFrames == 3 { app?.framesOnScreen(); hud.showHint("ESC OR OPT+SHIFT+F TO EXIT") }
+        if renderedFrames == 3 && !demo { app?.framesOnScreen(); hud.showHint("ESC OR OPT+SHIFT+F TO EXIT") }
         var dt = lastTime == 0 ? fixedDT : currentTime - lastTime
         lastTime = currentTime
         dt = clamp(dt, 0, 0.1)
@@ -248,7 +251,7 @@ final class GameScene: SKScene {
             physicsWorld.speed = 0
             dt = 0
         } else { physicsWorld.speed = ts }
-        if let c = canvas, c.smooth != cinema.zoomed { c.smooth = cinema.zoomed }
+        if let c = canvas, c.smooth != (cinema.zoomed || demo) { c.smooth = cinema.zoomed || demo }
         acc += dt
         var steps = 0
         while acc >= fixedDT - 1e-6, steps < 8 {
@@ -296,6 +299,7 @@ final class GameScene: SKScene {
     func frameUpdate(_ dt: Double, realDt: Double) {
         let fdt = CGFloat(dt)
         if let mv = mouseView, view != nil { mouse = convertPoint(fromView: mv) }
+        if demo { mouse = player.input.aim }
         for f in fighters {
             f.node.position = CGPoint(x: f.pos.x.rounded(), y: f.pos.y.rounded())
             f.hitFlash = max(0, f.hitFlash - fdt)
@@ -347,6 +351,7 @@ final class GameScene: SKScene {
     // MARK: input
 
     private func readPlayerInput() {
+        guard !demo else { return }
         var i = player.input
         let left = keysDown.contains(0) || keysDown.contains(123), right = keysDown.contains(2) || keysDown.contains(124)
         i.moveX = (right ? 1 : 0) - (left ? 1 : 0)

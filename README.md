@@ -62,7 +62,14 @@ The menu has Play/Pause, New Match, Bots (0–5), Difficulty and Mute.
 STICKWARS.app/Contents/MacOS/STICKWARS --selfcheck # extraction, one-way collision, fracture
 ```
 
-Commands: `fake`, `play`, `pause`, `step N`, `perf N`, `perfblast N`, `snap [lines] [crop x y w h] [/path.png]`,
+Demo reel (fake three-window desktop, player on autopilot vs 5 bots, 1080p60 MP4 with synthesized
+soundtrack; needs ffmpeg for the audio mux):
+
+```sh
+./dev.sh start && ./dev.sh "fake desktop" play "demo 5" "step 60" "record 36 $HOME/Desktop/stickwars-gameplay.mp4"
+```
+
+Commands: `fake [dark|desktop]`, `demo N`, `record SECONDS /path.mp4`, `play`, `pause`, `step N`, `perf N`, `perfblast N`, `snap [lines] [crop x y w h] [/path.png]`,
 `state`, `key CODE down|up`, `mouse X Y`, `click down|up`, `tp X Y`, `give N|NAME`, `shoot X1 Y1 X2 Y2`,
 `blast X Y R`, `grenade X Y VX VY`, `elements`, `bots`, `synth`. Results go to `/tmp/stickwars-out.txt`.
 Stepping drives `scene.update` and SpriteKit physics through `SKRenderer`, so it works with the display asleep.

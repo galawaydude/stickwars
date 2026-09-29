@@ -12,6 +12,10 @@ final class Audio {
     /// Dev: run the whole audio path at zero volume (for crash testing without noise).
     var silentTest = false
     private let sr: Double = 44100
+    /// Set while recording a demo reel: sounds are captured with this clock's timestamps.
+    var captureClock: (() -> Double)?
+    private(set) var captured: [(Sound, Float, Float, Double)] = []
+    private var lastCapture = [Double](repeating: -1, count: Sound.allCases.count)
     private var engine: AVAudioEngine?
     private var varispeed: AVAudioUnitVarispeed?
     /// Playback rate (slow-motion lowers pitch and speed together).
@@ -51,6 +55,12 @@ final class Audio {
 
     /// Pan is -1...1. Repeats of the same sound are throttled to one start per 35 ms.
     func play(_ s: Sound, volume: Float = 1, pan: Float = 0) {
+        // Demo recording: log the sound on the video clock instead of playing it.
+        if let clock = captureClock {
+            let t = clock()
+            if t - lastCapture[s.rawValue] > 0.035 { lastCapture[s.rawValue] = t; captured.append((s, volume, pan, t)) }
+            return
+        }
         guard !muted else { return }
         let t = now()
         guard t - lastStart[s.rawValue] > 0.035 else { return }
@@ -177,5 +187,58 @@ final class Audio {
 
     private func shifted(_ a: [Float], by sec: Double) -> [Float] {
         [Float](repeating: 0, count: Int(sec * sr)) + a
+    }
+
+    // MARK: demo soundtrack
+
+    func resetCapture() { captured.removeAll(); lastCapture = [Double](repeating: -1, count: Sound.allCases.count) }
+
+    /// Mixes the captured sound effects over a synthesized drum-and-bass loop (music plays between
+    /// musicFrom and musicTo seconds) and writes a stereo WAV.
+    func writeCapture(duration: Double, musicFrom: Double, musicTo: Double, to url: URL) throws {
+        let n = Int(duration * sr)
+        var L = [Float](repeating: 0, count: n), R = L
+        func add(_ buf: [Float], at t: Double, gain: Float, pan: Float) {
+            let start = Int(t * sr)
+            let gl = gain * sqrt(0.5 * (1 - pan)), gr = gain * sqrt(0.5 * (1 + pan))
+            for i in 0..<buf.count where start + i >= 0 && start + i < n { L[start + i] += buf[i] * gl; R[start + i] += buf[i] * gr }
+        }
+        // music: 128 BPM, A minor progression, kick / snare / hats / bass
+        let beat = 60.0 / 128
+        let kick = sweep(0.28, 130, 42, decay: 11, gain: 0.9)
+        let snare = mix(noise(0.18, cutoff: 0.6, decay: 18, gain: 0.7), sweep(0.1, 220, 160, decay: 30, gain: 0.3))
+        let hat = noise(0.04, cutoff: 1, decay: 90, gain: 0.25)
+        let roots: [Float] = [110, 87.31, 130.81, 98]   // A2 F2 C3 G2
+        var t = musicFrom, step = 0
+        while t < musicTo {
+            let bar = step / 16, s16 = step % 16
+            let fade = Float(min(1, (musicTo - t) / 1.5))
+            if s16 % 4 == 0 { add(kick, at: t, gain: 0.55 * fade, pan: 0) }
+            if s16 == 4 || s16 == 12 { add(snare, at: t, gain: 0.35 * fade, pan: 0.05) }
+            if s16 % 2 == 0 { add(hat, at: t, gain: 0.3 * fade, pan: s16 % 4 == 0 ? -0.3 : 0.3) }
+            if s16 % 2 == 0 {
+                let f = roots[bar % 4] * ([1, 1, 2, 1, 1.5, 1, 2, 1.5] as [Float])[(s16 / 2) % 8]
+                add(sweep(beat / 2 * 0.9, f, f, decay: 5, wave: 2, gain: 0.22), at: t, gain: 0.6 * fade, pan: 0)
+            }
+            t += beat / 4; step += 1
+        }
+        // sound effects
+        for (snd, vol, pan, at) in captured { add(cached(snd), at: at, gain: vol * 0.8, pan: pan) }
+        // soft limiter
+        for i in 0..<n { L[i] = tanh(L[i] * 0.9); R[i] = tanh(R[i] * 0.9) }
+        let fmt = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 2)!
+        let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(n))!
+        buf.frameLength = AVAudioFrameCount(n)
+        L.withUnsafeBufferPointer { buf.floatChannelData![0].update(from: $0.baseAddress!, count: n) }
+        R.withUnsafeBufferPointer { buf.floatChannelData![1].update(from: $0.baseAddress!, count: n) }
+        try? FileManager.default.removeItem(at: url)
+        let file = try AVAudioFile(forWriting: url, settings: fmt.settings)
+        try file.write(from: buf)
+    }
+
+    private var synthCache: [Int: [Float]] = [:]
+    private func cached(_ s: Sound) -> [Float] {
+        if let b = synthCache[s.rawValue] { return b }
+        let b = synth(s); synthCache[s.rawValue] = b; return b
     }
 }
