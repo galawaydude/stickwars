@@ -4,7 +4,7 @@
 
 <p align="center"><img src="docs/demo.gif" alt="stick figures fighting on top of Spotify and X"></p>
 
-<p align="center"><b><a href="https://github.com/galawaydude/stickwars/releases/download/v1.0/stickwars-gameplay.mp4">watch the full video (with sound)</a></b></p>
+<p align="center"><b><a href="https://github.com/galawaydude/stickwars/releases/download/v1.0/stickwars-gameplay.mp4">watch the full video</a></b></p>
 
 I always thought Alan Becker's stick figure animations were pretty cool. You know the ones, where the
 stick guy crawls out of the screen and starts wrecking the desktop. I wanted to see if Opus 5.5 could help
