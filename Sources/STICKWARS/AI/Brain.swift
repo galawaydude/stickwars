@@ -37,6 +37,10 @@ final class Brain {
     private var coverNode = -1
     /// Demo reels: keep this weapon instead of choosing by range.
     var lockedWeapon: Int?
+    /// Demo reels: stand still (looking around) until this time; flashier movement; better aim.
+    var holdUntil = 0.0
+    var stylish = false
+    var skillOverride: BotSkill?
 
     init(_ f: Fighter) { self.f = f }
 
@@ -52,7 +56,15 @@ final class Brain {
         inp.aim = f.input.aim
         let now = s.simTime
         guard f.alive, !s.matchOver else { f.input = inp; return }
-        let skill = s.difficulty.skill
+        let skill = skillOverride ?? s.difficulty.skill
+        if now < holdUntil {
+            // opening beat: catch breath, glance left and right, then weapon up
+            let look: CGFloat = sin(CGFloat(now) * 2.2) > 0 ? 1 : -1
+            inp.aim = f.shoulder + CGPoint(x: look * 200, y: -40)
+            f.facing = look
+            f.input = inp
+            return
+        }
 
         // 1. Target: sticky for 3-6 s, spread so bots don't all gang up on the player.
         if target < 0 || target >= s.fighters.count || !s.fighters[target].alive || now > targetUntil { pickTarget(s) }
@@ -139,6 +151,12 @@ final class Brain {
             // jump at targets above when no path found
             if T.pos.y > f.pos.y + 60 && f.grounded && rng.chance(0.02) { inp.jumpPressed = true; inp.jumpHeld = true }
         }
+        // Demo hero: flips and hops while fighting (double jump = front flip), wall-jumps off walls.
+        if stylish {
+            if f.grounded && rng.chance(0.012) { inp.jumpPressed = true; inp.jumpHeld = true }
+            if !f.grounded && f.vel.y < 120 && f.vel.y > -40 && f.airJumps > 0 && rng.chance(0.08) { inp.jumpPressed = true; inp.jumpHeld = true }
+            if !f.grounded && f.wallDir != 0 && rng.chance(0.1) { inp.jumpPressed = true; inp.jumpHeld = true }
+        }
         // Stuck against something: hop or wall-jump.
         if wantMove && abs(f.pos.x - lastX) < 0.3 && inp.moveX != 0 { stuckT += dt } else { stuckT = 0 }
         if stuckT > 0.35 { inp.jumpPressed = true; inp.jumpHeld = true; stuckT = 0; replanAt = now + 0.25 }
@@ -215,7 +233,7 @@ final class Brain {
         for b in s.brains where b !== self && b.target == s.player.id { onPlayer += 1 }
         for o in s.fighters where o.alive && o.id != f.id {
             var score = o.pos.dist(f.pos) + rng.range(0, 140)
-            if o.isPlayer { score += CGFloat(onPlayer) * 260 }
+            if o.isPlayer { score += s.demo ? -180 : CGFloat(onPlayer) * 260 }   // demo: the action comes to the hero
             if o.id == f.lastHitBy && s.simTime - f.lastHitTime < 2.5 { score -= 250 }
             if s.simTime < o.invulnUntil { score += 300 }
             if score < bestScore { bestScore = score; best = o.id }
@@ -226,6 +244,11 @@ final class Brain {
     }
 
     private func preferredRange() -> CGFloat {
+        let k: CGFloat = stylish ? 0.65 : 1
+        return k * baseRange()
+    }
+
+    private func baseRange() -> CGFloat {
         switch f.weapons.current {
         case 2, 9: return 130
         case 1, 4, 8: return 280

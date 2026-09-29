@@ -61,6 +61,7 @@ final class GameScene: SKScene {
     var botOverride: Int?
     /// Dev harness playing on a real screenshot: use Accessibility too, like the real game.
     var realCaptureInDev = false
+    var director = DirectorState()
     var fps = 0.0
     private var fpsFrames = 0, fpsStart = 0.0
 
@@ -217,7 +218,7 @@ final class GameScene: SKScene {
         f.grounded = true
         f.groundY = f.pos.y
         f.alive = true
-        f.hp = 100
+        f.hp = demo && !f.isPlayer ? 65 : 100   // demo reels: more kills, more slow-mo moments
         f.node.isHidden = false
         f.node.alpha = 1
         f.weapons.refill()
@@ -245,6 +246,7 @@ final class GameScene: SKScene {
         lastTime = currentTime
         dt = clamp(dt, 0, 0.1)
         let realDt = dt
+        if demo { direct() }
         // slow-motion scales everything: fixed steps, animation, particles and physics
         let ts = cinema.update(realDt)
         dt *= Double(ts)
@@ -314,6 +316,10 @@ final class GameScene: SKScene {
             if sp > 700 && rng.chance(0.7) {
                 let o = CGPoint(x: rng.range(-8, 8), y: rng.range(10, 50))
                 fx.line(f.pos + o, f.pos + o - f.vel.normalized * min(60, sp * 0.05), width: 1.5, color: SKColor(white: 1, alpha: 0.7), life: 0.12)
+            }
+            if demo {
+                f.tag.isHidden = true; f.marker.isHidden = true; f.hpBack.isHidden = true; f.hpFill.isHidden = true
+                continue
             }
             // HP bar over bots once hurt; bobbing arrow over the player
             if !f.isPlayer {

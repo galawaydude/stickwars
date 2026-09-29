@@ -39,6 +39,13 @@ final class HUD {
     private struct FeedLine { let node: SKNode; let until: Double }
     private var feed: [FeedLine] = []
     private var clock: CGFloat = 0
+    /// Demo reels: hide all chrome except the kill feed, callouts and banner.
+    var cinematic = false {
+        didSet {
+            let keep: [SKNode] = [calloutLabel, banner, bannerSub]
+            for n in root.children where !keep.contains(where: { $0 === n }) && !feed.contains(where: { $0.node === n }) { n.isHidden = cinematic }
+        }
+    }
     private var ghostHP: CGFloat = 100
     // cached shown values (strings are only rebuilt on change)
     private var shown = (app: "", hp: -1, weapon: -1, ammo: -1, grenades: -1, scores: -1, respawn: -1, crossAmmo: -1)
@@ -172,6 +179,7 @@ final class HUD {
 
     func update(_ s: GameScene, realDt: CGFloat, crosshairAt cp: CGPoint) {
         clock += realDt
+        if cinematic { updateFeedAndCallout(s, realDt); return }
         let p = s.player!
         if s.appName != shown.app {
             shown.app = s.appName
@@ -292,6 +300,10 @@ final class HUD {
         hintLabel.isHidden = hintT > 3.5
         if !hintLabel.isHidden { hintLabel.alpha = hintT > 2.8 ? (3.5 - hintT) / 0.7 : 1 }
 
+        updateFeedAndCallout(s, realDt)
+    }
+
+    private func updateFeedAndCallout(_ s: GameScene, _ realDt: CGFloat) {
         // callout pop
         calloutT += realDt
         if calloutT < 1.3 {

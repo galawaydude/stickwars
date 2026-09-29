@@ -44,28 +44,38 @@ final class Cinema {
 
     func impactFlash(_ strength: CGFloat = 0.35) { flash.alpha = max(flash.alpha, strength) }
 
+    /// Director camera (demo reels): framing used between slow-mo shots. Default = whole screen.
+    var baseZoom: CGFloat = 1
+    var baseFocus: CGPoint?
+    /// Constant film letterbox height (demo reels).
+    var filmBars: CGFloat = 0
+    private var camPos: CGPoint?
+
     /// Advances with the real frame time; returns the time scale to apply to the simulation.
     func update(_ realDt: Double) -> CGFloat {
         clock += realDt
         let dt = CGFloat(realDt)
         let ending = clock >= until
         let wantScale: CGFloat = ending ? 1 : target
-        let wantZoom: CGFloat = ending ? 1 : zoomTarget
+        let wantZoom: CGFloat = ending ? baseZoom : zoomTarget
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        let wantFocus = ending ? (baseFocus ?? center) : focus
         // snap into slow-mo quickly, ease out of it
         timeScale += (wantScale - timeScale) * (1 - exp(-(ending ? 5 : 18) * dt))
         if abs(timeScale - 1) < 0.01 && ending { timeScale = 1 }
-        zoom += (wantZoom - zoom) * (1 - exp(-(ending ? 4 : 7) * dt))
-        if abs(zoom - 1) < 0.002 && ending { zoom = 1 }
+        zoom += (wantZoom - zoom) * (1 - exp(-(ending ? 3 : 7) * dt))
+        if abs(zoom - wantZoom) < 0.002 && ending { zoom = wantZoom }
         let s = 1 / zoom
         cam.setScale(s)
-        // keep the view inside the screen
+        // ease the camera toward its focus, keeping the view inside the screen
+        var p = camPos ?? center
+        p = p + (wantFocus - p) * (1 - exp(-(ending ? 3.2 : 8) * dt))
+        if zoom <= 1.0005 && baseFocus == nil { p = center }
+        camPos = p
         let halfW = size.width * s / 2, halfH = size.height * s / 2
-        let center = CGPoint(x: size.width / 2, y: size.height / 2)
-        let pull = (zoom - 1) / max(0.01, zoomTarget - 1)
-        let want = center + (focus - center) * clamp(pull, 0, 1)
-        cam.position = CGPoint(x: clamp(want.x, halfW, size.width - halfW), y: clamp(want.y, halfH, size.height - halfH))
+        cam.position = CGPoint(x: clamp(p.x, halfW, size.width - halfW), y: clamp(p.y, halfH, size.height - halfH))
         // letterbox
-        let bar = 56 * clamp((zoom - 1) / 0.25, 0, 1)
+        let bar = max(filmBars, 56 * clamp((zoom - max(1, baseZoom)) / 0.25, 0, 1))
         barTop.position = CGPoint(x: size.width / 2, y: size.height - bar)
         barBottom.position = CGPoint(x: size.width / 2, y: bar)
         barTop.isHidden = bar < 0.5; barBottom.isHidden = bar < 0.5
@@ -77,7 +87,7 @@ final class Cinema {
     var zoomed: Bool { zoom > 1.001 }
 
     func reset() {
-        until = 0; timeScale = 1; zoom = 1; target = 1
+        until = 0; timeScale = 1; zoom = 1; target = 1; camPos = nil
         cam.setScale(1)
         cam.position = CGPoint(x: size.width / 2, y: size.height / 2)
         barTop.isHidden = true; barBottom.isHidden = true

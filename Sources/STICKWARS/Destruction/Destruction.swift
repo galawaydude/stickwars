@@ -241,6 +241,9 @@ extension GameScene {
             f.grounded = false
         }
         debris.blast(p, radius: R, speed: 900)
+        if demo, player.alive, player.center.dist(p) < R + 260 {
+            cinema.slowMo(0.55, scale: 0.3, at: p, zoom: 1.45)
+        }
     }
 
     /// True when a region is one plain colour (sampled on a small grid).

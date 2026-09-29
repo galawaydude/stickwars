@@ -76,7 +76,8 @@ final class DevHarness {
                     fake = img
                     scene.realCaptureInDev = true
                     app.start(image: img, appName: front, windows: wins, headless: true)
-                    fake = nil
+                    // later 'play's reuse this snapshot, so several takes can be shot from one capture
+                    fakeWindows = wins
                     desk = img
                 } catch { return "capture failed: \(error)" }
             }
@@ -90,6 +91,7 @@ final class DevHarness {
             scene.configureFighters()
             if !scene.brains.contains(where: { $0.f === scene.player }) { scene.brains.append(Brain(scene.player)) }
             scene.newMatch()
+            scene.startDirector()
             return "demo on, \(scene.fighters.count - 1) bots"
         case "record":
             let path = a.first(where: { $0.hasPrefix("/") }) ?? "/tmp/stickwars-demo.mp4"
@@ -160,13 +162,13 @@ final class DevHarness {
         let t0 = now()
         let desk = fake ?? self.desk
         // Intro: the untouched desktop, then the hotkey pops in.
-        for i in 0..<Int(1.8 * Double(fps)) {
+        for i in 0..<Int(1.5 * Double(fps)) {
             let t = CGFloat(i) / CGFloat(fps)
             rec.appendDrawn { ctx in
                 if let desk { ctx.interpolationQuality = .high; ctx.draw(desk, in: CGRect(x: 0, y: 0, width: W, height: H)) }
                 let k = t < 0.5 ? 0 : min(1, (t - 0.5) / 0.18)
                 if i == Int(0.5 * Double(fps)) { Audio.shared.play(.blip, volume: 0.8); Audio.shared.play(.pickup, volume: 0.6) }
-                if i == Int(1.55 * Double(fps)) { Audio.shared.play(.portal, volume: 0.8) }
+                if i == Int(1.3 * Double(fps)) { Audio.shared.play(.portal, volume: 0.8) }
                 if k > 0 {
                     let c = CGPoint(x: CGFloat(W) / 2, y: CGFloat(H) / 2)
                     let s = 150 * (0.8 + 0.2 * k) * (t > 1.2 ? 0.92 : 1)
@@ -178,15 +180,24 @@ final class DevHarness {
             }
         }
         // Gameplay: showcase weapons on the player's autopilot, a few seconds each.
-        let showcase = [3, 7, 8, 9, 2, 6, 5]
+        // weapon flow: SMG -> shotgun -> rockets -> black hole -> saw -> lightning -> laser
+        let showcase = [1, 2, 3, 7, 8, 9, 6]
         let playerBrain = scene.brains.first { $0.f === scene.player }
         let total = Int(seconds * Double(fps))
+        var finale = false
+        var heroAlive = 0
         for i in 0..<total {
             let sec = Double(i) / Double(fps)
-            let slot = showcase[min(showcase.count - 1, Int(sec / (seconds / Double(showcase.count))))]
+            let slot = showcase[min(showcase.count - 1, Int(max(0, sec - 2.4) / ((seconds - 2.4) / Double(showcase.count))))]
             if playerBrain?.lockedWeapon != slot { playerBrain?.lockedWeapon = slot; scene.player.input.switchTo = slot }
+            // closing hero shot: long slow-mo push-in on the hero
+            if !finale && sec > seconds - 2.6 && scene.player.alive {
+                finale = true
+                scene.cinema.slowMo(2.6, scale: 0.22, at: scene.player.center, zoom: 1.6, force: true)
+            }
             vt += 1.0 / Double(fps)
             renderer!.update(atTime: vt)
+            if scene.player.alive { heroAlive += 1 }
             rec.appendScene(renderer!, keep: i == total - 1)
             if i % 30 == 0 { try? await Task.sleep(nanoseconds: 100_000) } // let background work (nav graph) land
         }
@@ -230,7 +241,7 @@ final class DevHarness {
         } catch {}
         if muxed { try? FileManager.default.removeItem(atPath: silent); try? FileManager.default.removeItem(at: wav) }
         else { try? FileManager.default.moveItem(atPath: silent, toPath: path) }
-        return String(format: "recorded %@ (audio %@, %d sounds) ", path, muxed ? "yes" : "no", Audio.shared.captured.count) + String(format: "recorded %@ %dx%d %d frames (%.1f s video) in %.1f s", path, W, H, rec.frames, Double(rec.frames) / Double(fps), now() - t0)
+        return String(format: "hero alive %.0f%%, kills %d, deaths %d. ", Double(heroAlive) * 100 / Double(max(1, total)), scene.player.kills, scene.player.deaths) + String(format: "recorded %@ (audio %@, %d sounds) ", path, muxed ? "yes" : "no", Audio.shared.captured.count) + String(format: "recorded %@ %dx%d %d frames (%.1f s video) in %.1f s", path, W, H, rec.frames, Double(rec.frames) / Double(fps), now() - t0)
     }
 
     private func perf(_ n: Int, each: ((Int) -> Void)? = nil) -> String {
