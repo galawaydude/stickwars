@@ -29,6 +29,7 @@ final class Cinema {
         barTop.anchorPoint = CGPoint(x: 0.5, y: 0); barBottom.anchorPoint = CGPoint(x: 0.5, y: 1)
         flash.size = CGSize(width: size.width + 40, height: size.height + 40)
         flash.color = .white; flash.colorBlendFactor = 1; flash.alpha = 0; flash.zPosition = -4
+        flash.anchorPoint = .zero; flash.position = CGPoint(x: -20, y: -20)   // cover the whole screen
         flash.blendMode = .add
         blackout.size = flash.size; blackout.anchorPoint = .zero; blackout.position = CGPoint(x: -20, y: -20)
         blackout.color = .black; blackout.colorBlendFactor = 1; blackout.alpha = 0; blackout.zPosition = 50
