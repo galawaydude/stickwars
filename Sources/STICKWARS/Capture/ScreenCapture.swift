@@ -40,7 +40,7 @@ enum ScreenCapture {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
             let did = CGMainDisplayID()
             guard let display = content.displays.first(where: { $0.displayID == did }) ?? content.displays.first else {
-                throw NSError(domain: "STICKTOP", code: 1, userInfo: [NSLocalizedDescriptionKey: "No display"])
+                throw NSError(domain: "STICKWARS", code: 1, userInfo: [NSLocalizedDescriptionKey: "No display"])
             }
             let me = content.applications.filter { $0.processID == getpid() }
             filter = SCContentFilter(display: display, excludingApplications: me, exceptingWindows: [])

@@ -1,6 +1,6 @@
 import AppKit
 
-/// Tiny runnable self-check for pure logic: `STICKTOP --selfcheck`.
+/// Tiny runnable self-check for pure logic: `STICKWARS --selfcheck`.
 enum SelfCheck {
     static func run() -> Bool {
         var ok = true
