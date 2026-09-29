@@ -81,7 +81,7 @@ final class Particles {
 
 /// Pooled short-lived sprites: tracers, beams, muzzle flashes, rings.
 final class FXPool {
-    private struct F { var life: CGFloat, maxLife: CGFloat, grow: CGFloat, baseScale: CGFloat }
+    private struct F { var life: CGFloat, maxLife: CGFloat, grow: CGFloat, vx: CGFloat, vy: CGFloat }
     let node = SKNode()
     private var sprites: [SKSpriteNode] = []
     private var fs: [F] = []
@@ -94,7 +94,7 @@ final class FXPool {
             s.isHidden = true
             sprites.append(s); node.addChild(s)
         }
-        fs = [F](repeating: F(life: 0, maxLife: 1, grow: 0, baseScale: 1), count: cap)
+        fs = [F](repeating: F(life: 0, maxLife: 1, grow: 0, vx: 0, vy: 0), count: cap)
     }
 
     @discardableResult
@@ -107,9 +107,14 @@ final class FXPool {
         s.alpha = 1; s.setScale(1); s.zPosition = z
         s.blendMode = add ? .add : .alpha
         s.isHidden = false
-        fs[count] = F(life: life, maxLife: life, grow: grow, baseScale: 1)
+        fs[count] = F(life: life, maxLife: life, grow: grow, vx: 0, vy: 0)
         count += 1
         return s
+    }
+
+    /// Gives a just-spawned sprite a constant drift.
+    func setVelocity(_ s: SKSpriteNode, _ v: CGPoint) {
+        for i in stride(from: count - 1, through: 0, by: -1) where sprites[i] === s { fs[i].vx = v.x; fs[i].vy = v.y; return }
     }
 
     /// A line from a to b (tracer / beam).
@@ -133,6 +138,7 @@ final class FXPool {
             let s = sprites[i]
             s.alpha = f
             if fs[i].grow != 0 { s.setScale(1 + fs[i].grow * (1 - f)) }
+            if fs[i].vy != 0 || fs[i].vx != 0 { s.position = CGPoint(x: s.position.x + fs[i].vx * dt, y: s.position.y + fs[i].vy * dt) }
             i += 1
         }
     }

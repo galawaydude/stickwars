@@ -35,6 +35,10 @@ extension GameScene {
             case .plasma: spawnProjectile(.plasma, at: from, vel: dir * def.speed, owner: -1, bounces: 3)
             }
             return "shot \(def.name)"
+        case "bots":
+            var out = "nav nodes=\(nav.nodes.count) edges=\(nav.edges.reduce(0) { $0 + $1.count })\n"
+            for b in brains { out += b.debug(self) + "\n" }
+            return out
         case "grenade":
             spawnProjectile(.grenade, at: CGPoint(x: n(0), y: n(1)), vel: CGPoint(x: n(2), y: n(3)), owner: -1, fuse: 1.5)
             return "grenade"

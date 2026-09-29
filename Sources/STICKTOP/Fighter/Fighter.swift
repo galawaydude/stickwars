@@ -50,6 +50,7 @@ final class Fighter {
     var hp: CGFloat = 100
     var alive = true
     var respawnAt = 0.0
+    var spawnPoint: CGPoint?
     var invulnUntil = 0.0
     var kills = 0, deaths = 0
     var input = FighterInput()

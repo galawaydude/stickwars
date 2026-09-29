@@ -32,9 +32,18 @@ final class GameScene: SKScene {
     var hitStopLeft = 0.0
     var scratch: [Int] = []
 
-    // Fighters
+    // Fighters, bots and the match
     var fighters: [Fighter] = []
     var player: Fighter!
+    var brains: [Brain] = []
+    var portals: [SKSpriteNode] = []
+    var nav = NavGraph()
+    var navVersion = -1, navBuilding = false, navAt = 0.0
+    var matchOver = false, matchOverAt = 0.0, bannerLeft = -1
+    var matchStarted = false
+    var pickups: [Pickup] = []
+    var pickupAt = 0.0
+    let hud: HUD
     var platforms: [CGRect] = []   // tops of resting debris, refreshed per step
 
     // Timing
@@ -61,6 +70,7 @@ final class GameScene: SKScene {
 
     override init(size: CGSize) {
         level = Level(size: size)
+        hud = HUD(size: size)
         super.init(size: size)
         scaleMode = .fill
         anchorPoint = .zero
@@ -81,6 +91,7 @@ final class GameScene: SKScene {
         crosshair.size = CGSize(width: 22, height: 22)
         crosshair.zPosition = 500
         hudRoot.addChild(crosshair)
+        hudRoot.addChild(hud.root)
         physicsWorld.gravity = CGVector(dx: 0, dy: -14)
         physicsWorld.speed = 1
         // Thick floor and side walls so fast debris can't tunnel out.
@@ -104,6 +115,7 @@ final class GameScene: SKScene {
         fighters = [player]
         world.addChild(player.node)
         player.node.isHidden = true
+        player.alive = false
         player.rig.setWeapon(0)
     }
 
@@ -127,6 +139,13 @@ final class GameScene: SKScene {
         particles.clear()
         fx.clear()
         clearProjectiles()
+        for p in pickups { p.node.removeFromParent() }
+        pickups.removeAll()
+        pickupAt = simTime + 8
+        navVersion = -1
+        nav = NavGraph()
+        configureFighters()
+        if !matchStarted { matchStarted = true; newMatch() }
         level.reset([])
         lastTime = 0
         shakeAmp = 0
@@ -150,7 +169,6 @@ final class GameScene: SKScene {
         extracting = false
         extractMs = ex.ms
         extractInfo = "ax \(ex.axCount) px \(ex.pixelCount)"
-        for f in fighters where f.node.isHidden || f.pos == .zero { spawn(f) }
     }
 
     /// Random open spot on top of some element (or the floor).
@@ -169,8 +187,8 @@ final class GameScene: SKScene {
         return CGPoint(x: rng.range(40, size.width - 40), y: 0)
     }
 
-    func spawn(_ f: Fighter) {
-        f.pos = spawnPoint()
+    func spawn(_ f: Fighter, at p: CGPoint) {
+        f.pos = p
         f.vel = .zero
         f.grounded = true
         f.groundY = f.pos.y
@@ -179,6 +197,11 @@ final class GameScene: SKScene {
         f.node.isHidden = false
         f.node.alpha = 1
         f.weapons.refill()
+        f.lastHitBy = -1
+        f.jetFuel = 1
+        f.spawnPoint = nil
+        f.rig.setWeapon(f.weapons.current)
+        f.rig.root.zRotation = 0
     }
 
     func didPause() {
@@ -186,8 +209,6 @@ final class GameScene: SKScene {
         mouseDown = false
         shiftDown = false
     }
-
-    func newMatch() {}
 
     // MARK: loop
 
@@ -220,6 +241,7 @@ final class GameScene: SKScene {
         guard !extracting else { return }
         simTime += dt
         readPlayerInput()
+        for b in brains { b.think(self, dt) }
         let fdt = CGFloat(dt)
         debris.collectPlatforms(into: &platforms)
         platforms.withUnsafeBufferPointer { plat in

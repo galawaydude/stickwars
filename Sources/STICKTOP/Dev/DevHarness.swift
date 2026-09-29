@@ -71,7 +71,13 @@ final class DevHarness {
         case "pause":
             app.pause(); return "paused"
         case "step":
-            step(Int(num(a, 0, 1))); return "stepped \(Int(num(a, 0, 1)))"
+            // yield regularly so background results (nav graph) land like they would between frames
+            var left = Int(num(a, 0, 1))
+            while left > 0 {
+                let k = min(12, left); step(k); left -= k
+                try? await Task.sleep(nanoseconds: 200_000)
+            }
+            return "stepped \(Int(num(a, 0, 1)))"
         case "perf":
             let n = Int(num(a, 0, 240))
             return perf(n)
