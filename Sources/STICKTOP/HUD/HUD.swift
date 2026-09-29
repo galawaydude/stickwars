@@ -6,6 +6,8 @@ import SpriteKit
 final class HUD {
     let root = SKNode()
     private let size: CGSize
+    /// Top of the scoreboard: below the notch (camera housing) on MacBooks that have one.
+    private let scoreTop: CGFloat
     // top
     private let appLabel = SKSpriteNode()
     private let scorePanel = SKSpriteNode(), scoreSub = SKSpriteNode()
@@ -71,10 +73,12 @@ final class HUD {
     init(size: CGSize) {
         self.size = size
         let W = size.width, H = size.height
+        let notch = NSScreen.screens.first?.safeAreaInsets.top ?? 0
+        scoreTop = H - max(10, notch + 6)
 
         appLabel.anchorPoint = CGPoint(x: 0, y: 1); appLabel.position = CGPoint(x: 16, y: H - 12); appLabel.alpha = 0.85
         root.addChild(appLabel)
-        scorePanel.anchorPoint = CGPoint(x: 0.5, y: 1); scorePanel.position = CGPoint(x: W / 2, y: H - 10)
+        scorePanel.anchorPoint = CGPoint(x: 0.5, y: 1); scorePanel.position = CGPoint(x: W / 2, y: scoreTop)
         root.addChild(scorePanel)
         PixelFont.set(scoreSub, "FIRST TO \(GameScene.scoreLimit)", scale: 2, color: SKColor(white: 0.85, alpha: 1))
         scoreSub.anchorPoint = CGPoint(x: 1, y: 0.5); scoreSub.zPosition = 2
@@ -171,7 +175,7 @@ final class HUD {
             let w = entry * count + 16 + 110
             scorePanel.texture = HUD.panelTexture(Int(w / 2), 22, border: SKColor(white: 0.5, alpha: 1), fill: 0.55, inner: 0.1)
             scorePanel.size = CGSize(width: w, height: 44)
-            scoreSub.position = CGPoint(x: size.width / 2 + w / 2 - 14, y: size.height - 32)
+            scoreSub.position = CGPoint(x: size.width / 2 + w / 2 - 14, y: scoreTop - 22)
             let best = s.fighters.map(\.kills).max() ?? 0
             for (i, h) in scoreHeads.enumerated() {
                 let vis = i < s.fighters.count
@@ -179,10 +183,10 @@ final class HUD {
                 guard vis else { continue }
                 let f = s.fighters[i]
                 let x = size.width / 2 - w / 2 + 8 + entry * CGFloat(i) + 16
-                h.position = CGPoint(x: x, y: size.height - 32); h.color = f.color
+                h.position = CGPoint(x: x, y: scoreTop - 22); h.color = f.color
                 PixelFont.set(scoreNums[i], "\(f.kills)", scale: 3, color: f.kills == best && best > 0 ? SKColor(srgbRed: 1, green: 0.85, blue: 0.3, alpha: 1) : .white)
-                scoreNums[i].position = CGPoint(x: x + 14, y: size.height - 32)
-                if f.isPlayer { scoreMark.position = CGPoint(x: x + 12, y: size.height - 46) }
+                scoreNums[i].position = CGPoint(x: x + 14, y: scoreTop - 22)
+                if f.isPlayer { scoreMark.position = CGPoint(x: x + 12, y: scoreTop - 36) }
             }
         }
 
