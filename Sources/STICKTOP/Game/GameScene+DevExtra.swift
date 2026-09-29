@@ -36,6 +36,9 @@ extension GameScene {
             }
             return "shot \(def.name)"
         case "synth": return Audio.shared.synthCheck()
+        case "melt":
+            startMelt(out: a.first != "in") {}
+            return "melt \(a.first ?? "out")"
         case "bots":
             var out = "nav nodes=\(nav.nodes.count) edges=\(nav.edges.reduce(0) { $0 + $1.count })\n"
             for b in brains { out += b.debug(self) + "\n" }

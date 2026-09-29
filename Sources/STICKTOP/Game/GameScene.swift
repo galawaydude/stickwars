@@ -63,6 +63,14 @@ final class GameScene: SKScene {
     private var pendingGrenade = false, pendingReload = false, pendingSwitch = -1
     var shiftDown = false
 
+    // Screen melt (pause / resume transition)
+    let meltRoot = SKNode()
+    var meltCols: [SKSpriteNode] = []
+    var meltDelay: [CGFloat] = []
+    var meltT: CGFloat = 0
+    var meltOut = true
+    var meltDone: (() -> Void)?
+
     // Debug overlay
     let debugLabel = SKSpriteNode()
     var showDebug = false
@@ -96,6 +104,8 @@ final class GameScene: SKScene {
         crosshair.zPosition = 500
         hudRoot.addChild(crosshair)
         hudRoot.addChild(hud.root)
+        meltRoot.zPosition = 5000
+        addChild(meltRoot)
         physicsWorld.gravity = CGVector(dx: 0, dy: -14)
         physicsWorld.speed = 1
         // Thick floor and side walls so fast debris can't tunnel out.
@@ -208,6 +218,8 @@ final class GameScene: SKScene {
         f.rig.root.zRotation = 0
     }
 
+    func resetClock() { lastTime = 0; acc = 0 }
+
     func didPause() {
         keysDown.removeAll()
         mouseDown = false
@@ -221,6 +233,7 @@ final class GameScene: SKScene {
         var dt = lastTime == 0 ? fixedDT : currentTime - lastTime
         lastTime = currentTime
         dt = clamp(dt, 0, 0.1)
+        if melting { updateMelt(dt); return }
         if hitStopLeft > 0 {
             hitStopLeft -= dt
             physicsWorld.speed = 0
