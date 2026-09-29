@@ -54,6 +54,7 @@ final class GameScene: SKScene {
     private var acc = 0.0
     var simTime = 0.0
     var frameMs = 0.0
+    var renderedFrames = 0
     var fps = 0.0
     private var fpsFrames = 0, fpsStart = 0.0
 
@@ -231,6 +232,8 @@ final class GameScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         let t0 = now()
+        renderedFrames += 1
+        if renderedFrames == 3 { app?.framesOnScreen(); hud.showHint("ESC OR OPT+SHIFT+F TO EXIT") }
         var dt = lastTime == 0 ? fixedDT : currentTime - lastTime
         lastTime = currentTime
         dt = clamp(dt, 0, 0.1)

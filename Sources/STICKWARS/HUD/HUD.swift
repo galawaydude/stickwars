@@ -32,6 +32,8 @@ final class HUD {
     private let calloutLabel = SKSpriteNode()
     private var calloutT: CGFloat = 9
     private let respawnLabel = SKSpriteNode()
+    private let hintLabel = SKSpriteNode()
+    private var hintT: CGFloat = 9
     private let banner = SKSpriteNode(), bannerSub = SKSpriteNode()
     private struct FeedLine { let node: SKNode; let until: Double }
     private var feed: [FeedLine] = []
@@ -148,7 +150,8 @@ final class HUD {
         respawnLabel.position = CGPoint(x: W / 2, y: H / 2 + 60); respawnLabel.zPosition = 20; respawnLabel.isHidden = true
         banner.position = CGPoint(x: W / 2, y: H / 2 + 40); banner.zPosition = 20; banner.isHidden = true
         bannerSub.position = CGPoint(x: W / 2, y: H / 2 - 30); bannerSub.zPosition = 20; bannerSub.isHidden = true
-        for n in [calloutLabel, respawnLabel, banner, bannerSub] { root.addChild(n) }
+        hintLabel.position = CGPoint(x: W / 2, y: 150); hintLabel.zPosition = 20; hintLabel.isHidden = true
+        for n in [calloutLabel, respawnLabel, banner, bannerSub, hintLabel] { root.addChild(n) }
     }
 
     // MARK: per frame
@@ -267,6 +270,11 @@ final class HUD {
             if left >= 0 { PixelFont.set(respawnLabel, left > 0 ? "RESPAWN IN \(left)" : "GO!", scale: 5, color: .white) }
         }
 
+        // start-of-round hint
+        hintT += realDt
+        hintLabel.isHidden = hintT > 3.5
+        if !hintLabel.isHidden { hintLabel.alpha = hintT > 2.8 ? (3.5 - hintT) / 0.7 : 1 }
+
         // callout pop
         calloutT += realDt
         if calloutT < 1.3 {
@@ -288,6 +296,7 @@ final class HUD {
     // MARK: events
 
     func markHit() { hitT = 1 }
+    func showHint(_ text: String) { PixelFont.set(hintLabel, text, scale: 3, color: .white); hintT = 0 }
     func markKill() { killMarkT = 1 }
     func hurt() { hurtT = 1 }
 

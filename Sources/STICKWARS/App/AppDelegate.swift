@@ -21,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var playItem: NSMenuItem?
     private var loginItem: NSMenuItem?
     private var setup: SetupWindow?
+    private var escMonitor: Any?
+    private var watchdogToken = 0
 
     init(dev: Bool) { self.dev = dev }
 
@@ -37,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scene.app = self
         skView.presentScene(scene)
         skView.isPaused = true
+        scene.prewarm(in: skView)
         Audio.shared.muted = settings.muted || (dev && !CommandLine.arguments.contains("--audio"))
         Audio.shared.silentTest = dev
 
@@ -48,9 +51,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotKey = HotKey.optionShiftF { [weak self] in self?.toggle() }
             // First run, or Screen Recording still missing: the setup window walks through it
             // (instead of surprise system prompts), while nothing covers the screen.
-            let d = UserDefaults.standard
-            if !SetupWindow.screenGranted || !d.bool(forKey: "setupSeen") { showSetup() }
-            if SetupWindow.screenGranted { d.set(true, forKey: "setupSeen") }
+            // It keeps coming back until Screen Recording works and the user has played once, so after
+            // macOS's own "Quit & Reopen" it reappears with green checks and Play Now.
+            if !SetupWindow.screenGranted || !UserDefaults.standard.bool(forKey: "setupSeen") { showSetup() }
+            // Safety: anything else taking focus (a system dialog, Cmd-Tab, a notification click)
+            // pauses the game so the overlay never sits on top of something you need.
+            NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                guard let self, self.playing else { return }
+                self.pause()
+            }
+            // Esc works even if the keyboard focus got lost (needs Accessibility; harmless without it).
+            escMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] e in
+                if e.keyCode == 53, self?.playing == true { DispatchQueue.main.async { self?.pause() } }
+            }
         }
     }
 
@@ -114,9 +127,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch { SMAppService.openSystemSettingsLoginItems() }
     }
 
-    func showSetup() {
+    func showSetup(notice: String? = nil) {
         if setup == nil { setup = SetupWindow { [weak self] in self?.play() } }
-        setup?.show()
+        setup?.show(notice: notice)
     }
     @objc private func menuNewMatch() { scene.newMatch(); if !playing { play() } }
     @objc private func menuBots(_ s: NSMenuItem) {
@@ -173,22 +186,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             scene.app = self
             skView.presentScene(scene)
         }
+        // A blank capture (permission not in effect yet, display asleep...) would cover the screen
+        // with a flat colour: never take over the screen with it.
+        if !headless && ScreenCapture.isBlank(image) {
+            starting = false
+            showSetup(notice: "The screenshot came back blank, so the game didn't start. If you just turned on Screen Recording, click Relaunch.")
+            return
+        }
         scene.loadSnapshot(image, appName: appName, windows: windows)
+        if !headless { UserDefaults.standard.set(true, forKey: "setupSeen") }
         playing = true
         starting = false
         playItem?.title = "Pause"
         guard !headless else { return }
         window.setFrame(NSScreen.screens[0].frame, display: false)
+        scene.renderedFrames = 0
+        skView.isPaused = false
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         window.makeFirstResponder(skView)
-        skView.isPaused = false
-        if !cursorHidden { NSCursor.hide(); cursorHidden = true }
+        armWatchdog()
+    }
+
+    /// Watchdog: the game must be drawing and own the keyboard shortly after it appears, otherwise
+    /// it gets out of the way instead of leaving an overlay you can't control.
+    private func armWatchdog() {
+        watchdogToken += 1
+        let token = watchdogToken
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self, self.playing, token == self.watchdogToken else { return }
+            if !self.window.isKeyWindow || !NSApp.isActive {
+                NSApp.activate(ignoringOtherApps: true)
+                self.window.makeKeyAndOrderFront(nil)
+                self.window.makeFirstResponder(self.skView)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                guard let self, self.playing, token == self.watchdogToken else { return }
+                if self.scene.renderedFrames < 5 {
+                    self.emergencyExit("The game didn't start drawing, so it stepped aside. Try ⌥⇧F again.")
+                } else if !self.window.isKeyWindow {
+                    self.emergencyExit("STICKWARS couldn't get keyboard focus, so it stepped aside. Try ⌥⇧F again.")
+                }
+            }
+        }
+    }
+
+    /// Called by the scene once real frames are on screen: only now hide the cursor.
+    func framesOnScreen() {
+        guard playing, !cursorHidden, window.isVisible else { return }
+        NSCursor.hide(); cursorHidden = true
+    }
+
+    private func emergencyExit(_ why: String) {
+        pause()
+        showSetup(notice: why)
     }
 
     func pause() {
         guard playing else { return }
         playing = false
+        watchdogToken += 1
         playItem?.title = "Play"
         skView.isPaused = true
         scene.didPause()

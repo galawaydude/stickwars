@@ -13,6 +13,7 @@ final class SetupWindow: NSObject, NSWindowDelegate {
     private let screenButton = NSButton(), axButton = NSButton()
     private let relaunchBox = NSStackView()
     private let playButton = NSButton()
+    private let notice = NSTextField(wrappingLabelWithString: "")
     private let loginCheck = NSButton(checkboxWithTitle: "Open STICKWARS at login", target: nil, action: nil)
     /// Set once the user asked for Screen Recording in this run: the grant needs a relaunch.
     private var requestedScreen = false
@@ -33,7 +34,10 @@ final class SetupWindow: NSObject, NSWindowDelegate {
         window.center()
     }
 
-    func show() {
+    func show(notice text: String? = nil) {
+        notice.stringValue = text ?? ""
+        notice.isHidden = text == nil
+        fit()
         refresh()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -115,10 +119,13 @@ final class SetupWindow: NSObject, NSWindowDelegate {
         footer.orientation = .horizontal; footer.alignment = .centerY
 
         let box = NSBox(); box.boxType = .separator
-        let stack = NSStackView(views: [header, box, screenRow, axRow, relaunchBox, hint, footer])
+        notice.font = .systemFont(ofSize: 12, weight: .semibold)
+        notice.textColor = .systemRed
+        notice.isHidden = true
+        let stack = NSStackView(views: [header, box, notice, screenRow, axRow, relaunchBox, hint, footer])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 18
         stack.edgeInsets = NSEdgeInsets(top: 24, left: 28, bottom: 24, right: 28)
-        for v in [box, screenRow, axRow, footer] { v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -56).isActive = true }
+        for v in [box, notice, screenRow, axRow, footer] { v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -56).isActive = true }
         return stack
     }
 
@@ -143,7 +150,7 @@ final class SetupWindow: NSObject, NSWindowDelegate {
         let screen = SetupWindow.screenGranted, ax = SetupWindow.axGranted
         setStatus(screenIcon, screenButton, ok: screen, pending: requestedScreen)
         setStatus(axIcon, axButton, ok: ax)
-        let hideRelaunch = screen || !requestedScreen
+        let hideRelaunch = screen || (!requestedScreen && notice.isHidden)
         if relaunchBox.isHidden != hideRelaunch { relaunchBox.isHidden = hideRelaunch; fit() }
         playButton.isEnabled = screen
         loginCheck.state = SMAppService.mainApp.status == .enabled ? .on : .off

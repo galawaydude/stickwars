@@ -74,3 +74,37 @@ extension GameScene {
         return ctx.makeImage()
     }
 }
+
+extension GameScene {
+    /// Renders one throwaway frame containing every sprite flavour the game uses (tiles, add-blend,
+    /// linear and nearest filtering, tinted pixel art, debris-style textures) so Metal compiles the
+    /// pipelines at launch instead of hitching on the first explosion or slow-mo shot.
+    func prewarm(in view: SKView) {
+        let warm = SKNode()
+        let mt = SKMutableTexture(size: CGSize(width: 8, height: 8))
+        mt.modifyPixelData { p, len in if let p { memset(p, 200, len) } }
+        let img = Tex.image([UInt8](repeating: 180, count: 16 * 16 * 4), 16, 16)
+        let lin = SKTexture(cgImage: img); lin.filteringMode = .linear
+        let textures: [SKTexture] = [mt, lin, Tex.white, Tex.circle, Rig.capsule(10), Art.flash, Art.blast, Weapons.texture(0), PixelFont.texture("0")]
+        for (i, t) in textures.enumerated() {
+            for blend in [SKBlendMode.alpha, .add] {
+                for f in [SKTextureFilteringMode.nearest, .linear] {
+                    let s = SKSpriteNode(texture: t, size: CGSize(width: 8, height: 8))
+                    t.filteringMode = f
+                    s.blendMode = blend
+                    s.color = .red; s.colorBlendFactor = i % 2 == 0 ? 1 : 0
+                    s.alpha = 0.5
+                    s.position = CGPoint(x: 10 + CGFloat(i) * 10, y: 10)
+                    warm.addChild(s)
+                }
+            }
+        }
+        // restore the filtering the game expects on shared textures
+        for t in [Tex.white, Art.flash, Art.blast, Weapons.texture(0), PixelFont.texture("0")] { t.filteringMode = .nearest }
+        Tex.circle.filteringMode = .linear
+        Rig.capsule(10).filteringMode = .linear
+        addChild(warm)
+        _ = view.texture(from: warm)
+        warm.removeFromParent()
+    }
+}
