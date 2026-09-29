@@ -41,6 +41,7 @@ final class Brain {
     var holdUntil = 0.0
     var stylish = false
     var skillOverride: BotSkill?
+    var scripted = false
 
     init(_ f: Fighter) { self.f = f }
 
@@ -57,6 +58,7 @@ final class Brain {
         let now = s.simTime
         guard f.alive, !s.matchOver else { f.input = inp; return }
         let skill = skillOverride ?? s.difficulty.skill
+        if scripted { return }   // the director is driving this fighter
         if now < holdUntil {
             // opening beat: catch breath, glance left and right, then weapon up
             let look: CGFloat = sin(CGFloat(now) * 2.2) > 0 ? 1 : -1

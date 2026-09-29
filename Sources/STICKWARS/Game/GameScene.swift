@@ -64,6 +64,9 @@ final class GameScene: SKScene {
     var director = DirectorState()
     /// Demo reels: the window the action should stay around (scene coords).
     var stage: CGRect?
+    /// Demo finale: when it started, and when the giant black hole collapsed.
+    var finaleAt: Double?
+    var finaleCollapsedAt: Double?
     var fps = 0.0
     private var fpsFrames = 0, fpsStart = 0.0
 
@@ -106,7 +109,7 @@ final class GameScene: SKScene {
         camera = cinema.cam
         cinema.cam.addChild(hudRoot)
         hudRoot.position = CGPoint(x: -size.width / 2, y: -size.height / 2)
-        hudRoot.addChild(cinema.barTop); hudRoot.addChild(cinema.barBottom); hudRoot.addChild(cinema.flash)
+        hudRoot.addChild(cinema.barTop); hudRoot.addChild(cinema.barBottom); hudRoot.addChild(cinema.flash); hudRoot.addChild(cinema.blackout)
         physicsRoot.addChild(statics.root)
         physicsRoot.addChild(debris.root)
         ragdolls.root.zPosition = 8

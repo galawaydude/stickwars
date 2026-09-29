@@ -195,11 +195,13 @@ final class DevHarness {
             let sec = Double(i) / Double(fps)
             let slot = showcase[min(showcase.count - 1, Int(max(0, sec - 2.4) / ((seconds - 2.4) / Double(showcase.count))))]
             if playerBrain?.lockedWeapon != slot { playerBrain?.lockedWeapon = slot; scene.player.input.switchTo = slot }
-            // closing hero shot: long slow-mo push-in on the hero
-            if !finale && sec > seconds - 2.6 && scene.player.alive {
+            // finale: last giant black hole takes everyone out, then fade to black
+            if !finale && sec > seconds - 8 {
                 finale = true
-                scene.cinema.slowMo(2.6, scale: 0.22, at: scene.player.center, zoom: 1.6, force: true)
+                if !scene.player.alive { scene.spawn(scene.player, at: scene.spawnPoint(inStage: true)) }
+                scene.startFinale()
             }
+            scene.cinema.blackout.alpha = CGFloat(max(0, min(1, (sec - (seconds - 1.4)) / 1.2)))
             vt += 1.0 / Double(fps)
             renderer!.update(atTime: vt)
             if scene.player.alive { heroAlive += 1 }

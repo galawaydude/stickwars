@@ -6,6 +6,7 @@ struct Singularity {
     var pos: CGPoint
     var age: CGFloat = 0
     var owner: Int
+    var power: CGFloat = 1        // > 1: the demo finale's giant hole
     let core: SKSpriteNode, ring: SKSpriteNode, swirl: SKSpriteNode
     static let life: CGFloat = 2.4, reach: CGFloat = 250
 }
@@ -94,13 +95,13 @@ extension GameScene {
 
     // MARK: black hole
 
-    func openSingularity(at p: CGPoint, owner: Int) {
+    func openSingularity(at p: CGPoint, owner: Int, power: CGFloat = 1) {
         let core = SKSpriteNode(texture: Art.holeCore, size: CGSize(width: 10, height: 10))
         let ring = SKSpriteNode(texture: Art.holeRing, size: CGSize(width: 10, height: 10))
         let swirl = SKSpriteNode(texture: Art.swirl, size: CGSize(width: 10, height: 10))
         ring.blendMode = .add; swirl.blendMode = .add
         for (n, z) in [(swirl, CGFloat(33)), (core, 34), (ring, 35)] { n.position = p; n.zPosition = z; world.addChild(n) }
-        holes.append(Singularity(pos: p, owner: owner, core: core, ring: ring, swirl: swirl))
+        holes.append(Singularity(pos: p, owner: owner, power: power, core: core, ring: ring, swirl: swirl))
         Audio.shared.play(.blackhole, volume: 0.8, pan: pan(p))
         shake(4)
     }
@@ -112,19 +113,19 @@ extension GameScene {
             h.age += dt
             let grow = min(1, h.age / 0.35)
             let dying = h.age > Singularity.life - 0.25
-            let s = (dying ? max(0.05, (Singularity.life - h.age) / 0.25) : grow)
+            let s = (dying ? max(0.05, (Singularity.life - h.age) / 0.25) : grow) * pow(h.power, 0.7)
             h.core.size = CGSize(width: 70 * s, height: 70 * s)
             h.swirl.size = CGSize(width: 120 * s, height: 120 * s)
             h.ring.size = CGSize(width: 150 * s, height: 150 * s)
             h.swirl.zRotation -= dt * 7
             h.ring.zRotation = sin(h.age * 3) * 0.25
-            let R = Singularity.reach
+            let R = Singularity.reach * h.power
             // fighters get dragged in and hurt near the centre
             for f in fighters where f.alive {
                 let v = h.pos - f.center
                 let l = v.length
                 guard l < R, l > 1 else { continue }
-                let pull = (1 - l / R) * 2600 * dt
+                let pull = (1 - l / R) * 2600 * dt * (h.power > 1 && f.id != h.owner ? 1.6 : 1) * (h.power > 1 && f.id == h.owner ? 0 : 1)
                 f.vel = f.vel + v * (pull / l)
                 if !f.grounded || l < 120 { f.grounded = false }
                 if l < 42 { hurt(f, amount: 80 * dt, by: h.owner, dir: v * (1 / l), knock: 0) }
@@ -164,8 +165,9 @@ extension GameScene {
                 for n in [h.core, h.ring, h.swirl] { n.removeFromParent() }
                 holes.remove(at: i)
                 Audio.shared.play(.collapse, volume: 0.9, pan: pan(h.pos))
-                cinema.impactFlash(0.25)
-                explode(at: h.pos, radius: 78, damage: 55, owner: h.owner)
+                cinema.impactFlash(h.power > 1 ? 0.6 : 0.25)
+                explode(at: h.pos, radius: 78 * min(h.power, 1.8), damage: 55, owner: h.owner)
+                if h.power > 1 { finaleCollapse(at: h.pos, owner: h.owner) }
                 continue
             }
             holes[i] = h

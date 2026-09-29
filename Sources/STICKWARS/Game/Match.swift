@@ -149,6 +149,7 @@ extension GameScene {
                 continue
             }
             // portal opens 0.6 s before the respawn
+            if demo && finaleAt != nil { continue }   // nobody comes back during the finale
             if simTime >= f.respawnAt - 0.6, !extracting {
                 if f.spawnPoint == nil {
                     f.spawnPoint = spawnPoint(inStage: demo && stage != nil && (f.isPlayer || rng.chance(0.6)))
@@ -206,7 +207,7 @@ extension GameScene {
 
         if matchOver {
             let left = max(0, Int((4 - (simTime - matchOverAt)).rounded(.up)))
-            if simTime - matchOverAt > 4 { newMatch() } else if left != bannerLeft { bannerLeft = left; showWinner(left) }
+            if simTime - matchOverAt > 4 { if !(demo && finaleAt != nil) { newMatch() } } else if left != bannerLeft { bannerLeft = left; showWinner(left) }
         }
         updateNav()
     }

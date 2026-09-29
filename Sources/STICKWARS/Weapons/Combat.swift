@@ -429,7 +429,7 @@ extension GameScene {
                                        color: rng.chance(0.5) ? SKColor(srgbRed: 0.75, green: 0.35, blue: 1, alpha: 1) : .black, size: 3, gravity: 0, drag: 2)
                     }
                 } else {
-                    openSingularity(at: h.target.isNone ? b : h.point + h.normal * 6, owner: pr.owner)
+                    openSingularity(at: h.target.isNone ? b : h.point + h.normal * 6, owner: pr.owner, power: pr.power)
                     dead = true
                 }
             case .saw:
@@ -532,6 +532,7 @@ extension GameScene {
 
     func hurt(_ f: Fighter, amount: CGFloat, by: Int, dir: CGPoint, knock: CGFloat) {
         guard f.alive, simTime >= f.invulnUntil else { return }
+        if demo && finaleAt != nil && f.isPlayer { return }   // the hero survives the finale
         var amount = amount
         // bots hit the player softer, by difficulty (the player has one life bar vs. several bots)
         if f.isPlayer && by >= 0 && by != f.id { amount *= [0.5, 0.7, 1.0][difficulty.rawValue] }

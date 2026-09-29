@@ -13,6 +13,8 @@ final class Cinema {
     private var focus = CGPoint.zero
     let barTop = SKSpriteNode(texture: Tex.white), barBottom = SKSpriteNode(texture: Tex.white)
     let flash = SKSpriteNode(texture: Tex.white)
+    /// Fade-to-black for the end of demo reels.
+    let blackout = SKSpriteNode(texture: Tex.white)
     let size: CGSize
 
     init(size: CGSize) {
@@ -28,6 +30,8 @@ final class Cinema {
         flash.size = CGSize(width: size.width + 40, height: size.height + 40)
         flash.color = .white; flash.colorBlendFactor = 1; flash.alpha = 0; flash.zPosition = -4
         flash.blendMode = .add
+        blackout.size = flash.size; blackout.anchorPoint = .zero; blackout.position = CGPoint(x: -20, y: -20)
+        blackout.color = .black; blackout.colorBlendFactor = 1; blackout.alpha = 0; blackout.zPosition = 50
     }
 
     var active: Bool { clock < until }
@@ -92,6 +96,7 @@ final class Cinema {
         cam.position = CGPoint(x: size.width / 2, y: size.height / 2)
         barTop.isHidden = true; barBottom.isHidden = true
         flash.alpha = 0
+        blackout.alpha = 0
         Audio.shared.rate = 1
     }
 }
