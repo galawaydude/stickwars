@@ -77,7 +77,7 @@ final class HUD {
         scorePanel.anchorPoint = CGPoint(x: 0.5, y: 1); scorePanel.position = CGPoint(x: W / 2, y: H - 10)
         root.addChild(scorePanel)
         PixelFont.set(scoreSub, "FIRST TO \(GameScene.scoreLimit)", scale: 2, color: SKColor(white: 0.85, alpha: 1))
-        scoreSub.anchorPoint = CGPoint(x: 0.5, y: 1); scoreSub.zPosition = 2
+        scoreSub.anchorPoint = CGPoint(x: 1, y: 0.5); scoreSub.zPosition = 2
         root.addChild(scoreSub)
         scoreMark.color = SKColor(srgbRed: 1, green: 0.85, blue: 0.3, alpha: 1); scoreMark.colorBlendFactor = 1
         scoreMark.size = CGSize(width: 34, height: 3); scoreMark.zPosition = 3
@@ -168,10 +168,10 @@ final class HUD {
                 root.addChild(h); root.addChild(n); scoreHeads.append(h); scoreNums.append(n)
             }
             let entry: CGFloat = 70, count = CGFloat(s.fighters.count)
-            let w = entry * count + 16
+            let w = entry * count + 16 + 110
             scorePanel.texture = HUD.panelTexture(Int(w / 2), 22, border: SKColor(white: 0.5, alpha: 1), fill: 0.55, inner: 0.1)
             scorePanel.size = CGSize(width: w, height: 44)
-            scoreSub.position = CGPoint(x: size.width / 2, y: size.height - 60)
+            scoreSub.position = CGPoint(x: size.width / 2 + w / 2 - 14, y: size.height - 32)
             let best = s.fighters.map(\.kills).max() ?? 0
             for (i, h) in scoreHeads.enumerated() {
                 let vis = i < s.fighters.count
