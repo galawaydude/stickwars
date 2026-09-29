@@ -20,6 +20,7 @@ final class HUD {
     private let hpLabel = SKSpriteNode()
     private let hpBack = SKSpriteNode(texture: Tex.white), hpFill = SKSpriteNode(texture: Tex.white), hpGhost = SKSpriteNode(texture: Tex.white)
     private let jetBack = SKSpriteNode(texture: Tex.white), jetFill = SKSpriteNode(texture: Tex.white)
+    private let armorBack = SKSpriteNode(texture: Tex.white), armorFill = SKSpriteNode(texture: Tex.white)
     private var grenadeIcons: [SKSpriteNode] = []
     private var slots: [SKSpriteNode] = [], slotIcons: [SKSpriteNode] = []
     private let selector = SKSpriteNode()
@@ -56,9 +57,9 @@ final class HUD {
 
     private static var vignetteTexture: SKTexture {
         Tex.drawn("vignette", 128, 80) { c in
-            let g = CGGradient(colorsSpace: sRGB, colors: [CGColor(srgbRed: 0.9, green: 0, blue: 0, alpha: 0), CGColor(srgbRed: 0.9, green: 0.02, blue: 0.02, alpha: 0.9)] as CFArray, locations: [0.55, 1])!
+            let g = CGGradient(colorsSpace: sRGB, colors: [CGColor(srgbRed: 0.9, green: 0, blue: 0, alpha: 0), CGColor(srgbRed: 0.9, green: 0.02, blue: 0.02, alpha: 0.8)] as CFArray, locations: [0.78, 1])!
             c.scaleBy(x: 1, y: 80.0 / 128.0)
-            c.drawRadialGradient(g, startCenter: CGPoint(x: 64, y: 64), startRadius: 0, endCenter: CGPoint(x: 64, y: 64), endRadius: 78, options: .drawsAfterEndLocation)
+            c.drawRadialGradient(g, startCenter: CGPoint(x: 64, y: 64), startRadius: 0, endCenter: CGPoint(x: 64, y: 64), endRadius: 84, options: .drawsAfterEndLocation)
         }
     }
 
@@ -105,6 +106,7 @@ final class HUD {
         hpGhost.anchorPoint = CGPoint(x: 0, y: 0.5); hpGhost.size = CGSize(width: 244, height: 14); hpGhost.position = hpFill.position
         hpGhost.color = SKColor(white: 1, alpha: 0.9); hpGhost.colorBlendFactor = 1; hpGhost.zPosition = 2
         root.addChild(hpGhost)
+        bar(armorBack, armorFill, at: CGPoint(x: x0 + 70, y: y0 + 49), w: 244, h: 4, color: SKColor(srgbRed: 0.35, green: 0.65, blue: 1, alpha: 1))
         bar(jetBack, jetFill, at: CGPoint(x: x0 + 70, y: y0 + 16), w: 150, h: 5, color: SKColor(srgbRed: 0.35, green: 0.9, blue: 1, alpha: 1))
         let jl = PixelFont.label("JET", scale: 2, color: SKColor(srgbRed: 0.35, green: 0.9, blue: 1, alpha: 1))
         jl.anchorPoint = CGPoint(x: 0, y: 0.5); jl.position = CGPoint(x: x0 + 14, y: y0 + 16); jl.zPosition = 2
@@ -122,14 +124,26 @@ final class HUD {
             s.size = CGSize(width: sw, height: 32); s.anchorPoint = .zero
             s.position = CGPoint(x: x0 + CGFloat(i) * (sw + gap), y: y0 + cardH + 6)
             root.addChild(s); slots.append(s)
-            let t = Weapons.texture(i)
-            let ic = SKSpriteNode(texture: t, size: t.size())
-            ic.position = s.position + CGPoint(x: sw / 2 + 3, y: 14); ic.zPosition = 2
+            let t = Weapons.texture(i), sz = Weapons.all[i].art.svg.size
+            let k = min(1, (sw - 8) / sz.width)
+            let ic = SKSpriteNode(texture: t, size: CGSize(width: sz.width * k, height: sz.height * k))
+            ic.position = s.position + CGPoint(x: sw / 2 + 2, y: 13); ic.zPosition = 2
             root.addChild(ic); slotIcons.append(ic)
-            let num = PixelFont.label("\(i + 1)", scale: 2, color: SKColor(white: 0.85, alpha: 1))
+            let num = PixelFont.label("\((i + 1) % 10)", scale: 2, color: SKColor(white: 0.85, alpha: 1))
             num.anchorPoint = CGPoint(x: 0, y: 1); num.position = s.position + CGPoint(x: 4, y: 29); num.zPosition = 3
             root.addChild(num)
         }
+        // knife: always on F
+        let ks = SKSpriteNode(texture: HUD.panelTexture(22, 16, border: SKColor(white: 0.4, alpha: 1), fill: 0.6, inner: 0.12))
+        ks.size = CGSize(width: sw, height: 32); ks.anchorPoint = .zero
+        ks.position = CGPoint(x: x0 + CGFloat(Weapons.all.count) * (sw + gap) + 8, y: y0 + cardH + 6)
+        root.addChild(ks)
+        let kn = SKSpriteNode(texture: Weapons.knifeTexture, size: CGSize(width: GunArts.knife.svg.size.width, height: GunArts.knife.svg.size.height))
+        kn.position = ks.position + CGPoint(x: sw / 2 + 2, y: 12); kn.zPosition = 2
+        root.addChild(kn)
+        let kf = PixelFont.label("F", scale: 2, color: SKColor(srgbRed: 1, green: 0.85, blue: 0.3, alpha: 1))
+        kf.anchorPoint = CGPoint(x: 0, y: 1); kf.position = ks.position + CGPoint(x: 4, y: 29); kf.zPosition = 3
+        root.addChild(kf)
         selector.texture = HUD.panelTexture(24, 18, border: SKColor(srgbRed: 0.35, green: 0.95, blue: 1, alpha: 1), fill: 0.7, inner: 0.25)
         selector.size = CGSize(width: sw + 4, height: 36); selector.anchorPoint = .zero; selector.zPosition = 1
         root.addChild(selector)
@@ -198,8 +212,8 @@ final class HUD {
         let st = p.weapons.slots[w], def = p.weapons.def
         if w != shown.weapon {
             shown.weapon = w
-            let t = Weapons.texture(w)
-            weaponIcon.texture = t; weaponIcon.size = CGSize(width: t.size().width * 2, height: t.size().height * 2)
+            let sz = Weapons.all[w].art.svg.size, k = min(1.3, 64 / sz.width)
+            weaponIcon.texture = Weapons.texture(w); weaponIcon.size = CGSize(width: sz.width * k, height: sz.height * k)
             PixelFont.set(weaponName, def.name, scale: 2, color: SKColor(srgbRed: 0.6, green: 0.95, blue: 1, alpha: 1))
             selector.position = slots[w].position - CGPoint(x: 2, y: 2)
             for (i, ic) in slotIcons.enumerated() { ic.alpha = i == w ? 1 : 0.5 }
@@ -234,6 +248,8 @@ final class HUD {
         ghostHP = max(hp, ghostHP - realDt * 60)
         hpGhost.xScale = max(0.001, ghostHP / 100)
         jetFill.xScale = max(0.001, p.jetFuel)
+        armorBack.isHidden = p.armor <= 0; armorFill.isHidden = p.armor <= 0
+        if p.armor > 0 { armorFill.xScale = max(0.001, p.armor / 100) }
         if p.weapons.grenades != shown.grenades {
             shown.grenades = p.weapons.grenades
             for (i, g) in grenadeIcons.enumerated() { g.alpha = i < p.weapons.grenades ? 1 : 0.2 }
@@ -259,8 +275,9 @@ final class HUD {
 
         // damage vignette + low HP pulse
         hurtT = max(0, hurtT - realDt * 2.5)
-        let low: CGFloat = p.alive && hp < 35 ? 0.35 + 0.2 * sin(clock * 6) : 0
-        vignette.alpha = max(hurtT * 0.8, low)
+        // edges only, and never more than a tint: the screen underneath must stay readable
+        let low: CGFloat = p.alive && hp < 35 ? 0.22 + 0.12 * sin(clock * 6) : 0
+        vignette.alpha = max(hurtT * 0.55, low)
 
         // respawn countdown
         let left = p.alive || s.matchOver ? -1 : max(0, Int((p.respawnAt - s.simTime).rounded(.up)))
@@ -311,8 +328,8 @@ final class HUD {
         func add(_ n: SKSpriteNode) { n.anchorPoint = CGPoint(x: 1, y: 0.5); n.position = CGPoint(x: x, y: 0); line.addChild(n); x -= n.size.width + 6 }
         add(PixelFont.label(victim.name, scale: 2, color: victim.color.blended(withFraction: 0.3, of: .white) ?? victim.color))
         if let killer, killer !== victim {
-            let t = Weapons.texture(weapon)
-            add(SKSpriteNode(texture: t, size: CGSize(width: t.size().width, height: t.size().height)))
+            let sz = Weapons.all[weapon].art.svg.size
+            add(SKSpriteNode(texture: Weapons.texture(weapon), size: CGSize(width: sz.width * 0.6, height: sz.height * 0.6)))
             add(PixelFont.label(killer.name, scale: 2, color: killer.color.blended(withFraction: 0.3, of: .white) ?? killer.color))
         } else {
             add(PixelFont.label("X", scale: 2, color: .red))

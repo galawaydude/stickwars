@@ -37,6 +37,10 @@ final class Rig {
     private let head: SKSpriteNode
     let gun = SKSpriteNode()
     private let chargeGlow = SKSpriteNode()
+    private let gunSpinner = SKSpriteNode()   // loaded saw blade / black-hole swirl on the gun
+    private let knife = SKSpriteNode(texture: Weapons.knifeTexture)
+    private let vest = SKSpriteNode(texture: GunArts.vest.texture("vest"))
+    private let helmet = SKSpriteNode(texture: GunArts.helmet.texture("helmet"))
     private var pose = Pose()
     private var runPhase: CGFloat = 0
     private var landT: CGFloat = 0
@@ -78,9 +82,25 @@ final class Rig {
         chargeGlow.isHidden = true
         chargeGlow.zPosition = 1
         gun.addChild(chargeGlow)
+        gunSpinner.zPosition = 2
+        gunSpinner.isHidden = true
+        gun.addChild(gunSpinner)
+        knife.size = GunArts.knife.svg.size
+        knife.anchorPoint = GunArts.knife.svg.anchor(GunArts.knife.grip)
+        knife.zPosition = 1.2
+        knife.isHidden = true
+        vest.size = CGSize(width: GunArts.vest.size.width * 0.95, height: GunArts.vest.size.height * 0.95)
+        vest.zPosition = 0.5
+        vest.isHidden = true
+        torsoB.addChild(vest)
+        helmet.size = GunArts.helmet.size
+        helmet.position = CGPoint(x: 0, y: 3.5)
+        helmet.zPosition = 0.5
+        helmet.isHidden = true
+        head.addChild(helmet)
         root.position = CGPoint(x: 0, y: Rig.pivotY)
         root.addChild(inner)
-        for n in [upperBB, foreBB, thighBB, shinBB, torsoB, thighFB, shinFB, head, gun, upperFB, foreFB] { inner.addChild(n) }
+        for n in [upperBB, foreBB, knife, thighBB, shinBB, torsoB, thighFB, shinFB, head, gun, upperFB, foreFB] { inner.addChild(n) }
         frontBones = [thighFB, shinFB, torsoB, upperFB, foreFB, head]
         backBones = [thighBB, shinBB, upperBB, foreBB]
     }
@@ -95,13 +115,28 @@ final class Rig {
     func setWeapon(_ i: Int) {
         guard i != gunIndex else { return }
         gunIndex = i
-        let t = Weapons.texture(i), d = Weapons.all[i]
-        gun.texture = t
-        gun.size = CGSize(width: t.size().width * 2, height: t.size().height * 2)
-        gun.anchorPoint = Tex.anchor(t, px: d.grip.0, d.grip.1)
-        // muzzle offset from grip in points (gun space, y up)
-        muzzleLocal = CGPoint(x: CGFloat(d.muzzle.0 - d.grip.0) * 2, y: CGFloat(d.grip.1 - d.muzzle.1) * 2)
+        let art = Weapons.all[i].art
+        gun.texture = Weapons.texture(i)
+        gun.size = art.svg.size
+        gun.anchorPoint = art.svg.anchor(art.grip)
+        // view-box point -> gun-local point (origin at the grip, y up)
+        func local(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x - art.grip.x, y: art.grip.y - p.y) }
+        muzzleLocal = local(art.muzzle)
         chargeGlow.position = muzzleLocal
+        switch Weapons.all[i].kind {
+        case .saw:
+            gunSpinner.texture = GunArts.sawBlade.texture("sawblade")
+            gunSpinner.size = CGSize(width: 16, height: 16)
+            gunSpinner.position = local(CGPoint(x: 45, y: 11))
+            gunSpinner.isHidden = false
+        case .blackhole:
+            gunSpinner.texture = Art.swirl
+            gunSpinner.size = CGSize(width: 15, height: 15)
+            gunSpinner.position = local(CGPoint(x: 42, y: 10))
+            gunSpinner.isHidden = false
+        default:
+            gunSpinner.isHidden = true
+        }
     }
 
     @inline(__always) private static func easeOut(_ t: CGFloat) -> CGFloat { 1 - (1 - t) * (1 - t) * (1 - t) }
@@ -182,13 +217,20 @@ final class Rig {
             // idle weapon sway
             if f.grounded && speed < 30 { a += sin(clock * 1.7) * 0.02 }
             t.armUF = a - 0.15; t.armLF = a
-            if def.twoHanded { t.armUB = a + 0.05; t.armLB = a + 0.3 } else {
+            if f.slashT < 1 {
+                // knife slash: back arm whips from high behind to low in front
+                f.slashT = min(1, f.slashT + dt / 0.24)
+                let e = Rig.easeOut(f.slashT)
+                let base = atan2((f.input.aim - f.shoulder).x * facing, -(f.input.aim - f.shoulder).y)
+                t.armUB = base + 1.9 - 3.2 * e; t.armLB = t.armUB - 0.2
+                t.lean += 0.25 * sin(.pi * f.slashT)
+            } else if def.twoHanded { t.armUB = a + 0.05; t.armLB = a + 0.3 } else {
                 // free arm pumps with the run
                 t.armUB = f.grounded && speed > 30 ? -0.9 * sin(runPhase) : 0.25; t.armLB = t.armUB + 0.9
             }
         }
 
-        let k = 1 - exp(-22 * dt), armK = flipping ? 1 : 1 - exp(-45 * dt)
+        let k = 1 - exp(-22 * dt), armK = flipping || f.slashT < 1 ? 1 : 1 - exp(-45 * dt)
         pose.blend(to: t, k, armK: armK)
 
         // Forward kinematics with the pelvis at the origin.
@@ -228,6 +270,18 @@ final class Rig {
         gun.zRotation = ga
         gun.setScale(f.switchT < 1 ? 0.55 + 0.45 * Rig.easeOut(f.switchT) : 1)
         gun.isHidden = !f.alive
+        if !gunSpinner.isHidden {
+            let spin: CGFloat = def.kind == .saw ? (slot.ammo > 0 ? 30 : 0) : 4
+            gunSpinner.zRotation -= spin * dt
+            gunSpinner.alpha = def.kind == .saw && slot.ammo == 0 ? 0 : 1
+        }
+        // knife in the back hand while slashing
+        knife.isHidden = f.slashT >= 1 || !f.alive
+        if !knife.isHidden { knife.position = handB; knife.zRotation = p.armLB - .pi / 2 }
+        // armour plates and helmet
+        let armored = f.armor > 0 && f.alive
+        if vest.isHidden == armored { vest.isHidden = !armored; helmet.isHidden = !armored }
+        if armored { vest.alpha = 0.55 + 0.45 * min(1, f.armor / 50); helmet.alpha = vest.alpha }
 
         let flash = f.hitFlash > 0
         if flash != flashing {

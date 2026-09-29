@@ -62,6 +62,8 @@ final class Brain {
         let pref = preferredRange()
         if f.hp < 55, let pk = s.nearestPickup(to: f.pos), pk.dist(f.pos) < 800 {
             goal = pk
+        } else if f.armor < 25, let pk = s.nearestPickup(to: f.pos, .armor), pk.dist(f.pos) < 500 {
+            goal = pk
         } else if f.hp < 35, let T, dist < 400 {
             if coverNode < 0 || coverNode >= s.nav.nodes.count || now >= replanAt { coverNode = s.coverNode(for: f, from: T) }
             if coverNode >= 0 { let n = s.nav.nodes[coverNode]; goal = CGPoint(x: (n.x0 + n.x1) / 2, y: n.y) }
@@ -191,6 +193,7 @@ final class Brain {
             } else if def.kind == .charge && f.weapons.slots[f.weapons.current].charging {
                 inp.fire = true // keep charging until sight returns
             }
+            if dist < 58 && hasLOS && rng.chance(0.25) { inp.melee = true }
             if dist > 110 && dist < 420 && f.weapons.grenades > 0 && now > grenadeAt && rng.chance(skill.grenadeChance) && hasLOS {
                 grenadeAt = now + 4
                 inp.grenade = true
@@ -222,8 +225,8 @@ final class Brain {
 
     private func preferredRange() -> CGFloat {
         switch f.weapons.current {
-        case 2: return 120
-        case 1, 4: return 280
+        case 2, 9: return 130
+        case 1, 4, 8: return 280
         case 3: return 380
         default: return 360
         }
@@ -231,11 +234,11 @@ final class Brain {
 
     private func chooseWeapon(dist: CGFloat, below: Bool) -> Int {
         let r = rng.unit()
-        if dist < 170 { return r < 0.6 ? 2 : 1 }
+        if dist < 170 { return r < 0.45 ? 2 : r < 0.75 ? 9 : 1 }
         if dist < 420 {
-            if below && r < 0.25 { return 3 }
-            return r < 0.4 ? 1 : r < 0.75 ? 4 : 0
+            if below && r < 0.2 { return 3 }
+            return r < 0.3 ? 1 : r < 0.5 ? 4 : r < 0.68 ? 8 : r < 0.84 ? 9 : r < 0.92 ? 7 : 0
         }
-        return r < 0.35 ? 6 : r < 0.6 ? 5 : r < 0.8 ? 0 : 3
+        return r < 0.3 ? 6 : r < 0.5 ? 5 : r < 0.65 ? 7 : r < 0.8 ? 8 : r < 0.9 ? 0 : 3
     }
 }

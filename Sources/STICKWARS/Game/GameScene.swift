@@ -27,6 +27,7 @@ final class GameScene: SKScene {
     let projectileRoot = SKNode()
     var projectiles: [Projectile] = []
     var projectilePool: [SKSpriteNode] = []
+    var holes: [Singularity] = []
     let ragdolls = Ragdolls()
     let cinema: Cinema
     var streak = 0, streakAt = -10.0
@@ -65,7 +66,7 @@ final class GameScene: SKScene {
     var mouseView: CGPoint?
     var mouseDown = false
     private var pendingJump = false, pendingDown = false, pendingFire = false, pendingRelease = false
-    private var pendingGrenade = false, pendingReload = false, pendingSwitch = -1
+    private var pendingGrenade = false, pendingReload = false, pendingSwitch = -1, pendingMelee = false
     var shiftDown = false
 
     // Debug overlay
@@ -156,6 +157,7 @@ final class GameScene: SKScene {
         particles.clear()
         fx.clear()
         clearProjectiles()
+        clearSingularities()
         for p in pickups { p.node.removeFromParent() }
         pickups.removeAll()
         pickupAt = simTime + 8
@@ -286,6 +288,7 @@ final class GameScene: SKScene {
         }
         for f in fighters where f.alive { updateWeapons(f, dt) }
         updateProjectiles(fdt)
+        updateSingularities(fdt)
         updateMatch(dt)
         for f in fighters { f.input.clearEdges() }
     }
@@ -357,6 +360,7 @@ final class GameScene: SKScene {
         if pendingFire { i.firePressed = true; pendingFire = false }
         if pendingRelease { i.fireReleased = true; pendingRelease = false }
         if pendingGrenade { i.grenade = true; pendingGrenade = false }
+        if pendingMelee { i.melee = true; pendingMelee = false }
         if pendingReload { i.reload = true; pendingReload = false }
         if pendingSwitch >= 0 { i.switchTo = pendingSwitch; pendingSwitch = -1 }
         player.input = i
@@ -374,8 +378,9 @@ final class GameScene: SKScene {
             case 1, 125: pendingDown = true                        // S, Down
             case 15: pendingReload = true                          // R
             case 99: showDebug.toggle(); debugLabel.isHidden = !showDebug   // F3
-            case 18, 19, 20, 21, 23, 22, 26:                       // 1-7
-                pendingSwitch = [18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6][code]!
+            case 3, 9: pendingMelee = true                          // F, V: knife
+            case 18, 19, 20, 21, 23, 22, 26, 28, 25, 29:            // 1-9, 0
+                pendingSwitch = [18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6, 28: 7, 25: 8, 29: 9][code]!
             default: break
             }
         } else {

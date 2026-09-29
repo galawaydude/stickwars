@@ -1,13 +1,16 @@
 import SpriteKit
 
 struct Projectile {
-    enum Kind { case rocket, plasma, grenade }
+    enum Kind { case rocket, plasma, grenade, blackhole, saw }
     var kind: Kind
     var pos: CGPoint
     var vel: CGPoint
     var owner: Int
     var age: CGFloat = 0
     var bounces = 0
+    var hitID = -1            // saw: last fighter cut (so one pass hits once)
+    var stuck: CGFloat = 0    // saw: > 0 while embedded in something
+    var cuts = 0
     var fuse: CGFloat = 0
     var power: CGFloat = 1
     var node: SKSpriteNode
@@ -112,6 +115,8 @@ extension GameScene {
         belt.slots[belt.current] = s
         f.weapons = belt
 
+        if inp.melee { slash(f) }
+
         if inp.grenade && f.weapons.grenades > 0 {
             f.weapons.grenades -= 1
             throwGrenade(f)
@@ -192,6 +197,14 @@ extension GameScene {
             laser(from: m, dir: dir, def: def, owner: f.id)
         case .rocket:
             spawnProjectile(.rocket, at: m, vel: dir * def.speed, owner: f.id)
+        case .blackhole:
+            spawnProjectile(.blackhole, at: m, vel: dir * def.speed, owner: f.id)
+            fx.spawn(Art.swirl, at: m, size: CGSize(width: 34, height: 34), color: SKColor(srgbRed: 0.8, green: 0.4, blue: 1, alpha: 1), life: 0.2, grow: 1, z: 5, add: true)
+        case .saw:
+            spawnProjectile(.saw, at: m, vel: dir * def.speed, owner: f.id, bounces: 5)
+        case .lightning:
+            lightning(from: m, dir: dir, def: def, owner: f.id)
+            particles.burst(m, n: 3, speed: 160, life: 0.15, color: def.tracer, size: 2)
         case .plasma:
             let a = atan2(dir.y, dir.x) + rng.range(-def.spread, def.spread)
             spawnProjectile(.plasma, at: m, vel: CGPoint(x: cos(a), y: sin(a)) * def.speed, owner: f.id, bounces: 3)
@@ -343,13 +356,17 @@ extension GameScene {
         let node: SKSpriteNode
         if let n = projectilePool.popLast() { node = n } else { node = SKSpriteNode(); projectileRoot.addChild(node) }
         let tex: SKTexture
+        var sz: CGSize
         switch kind {
-        case .rocket: tex = Art.rocket
-        case .plasma: tex = Art.plasma
-        case .grenade: tex = Art.grenade
+        case .rocket: tex = Art.rocket; sz = CGSize(width: 18, height: 10)
+        case .plasma: tex = Art.plasma; sz = CGSize(width: 12, height: 8)
+        case .grenade: tex = Art.grenade; sz = CGSize(width: 12, height: 14)
+        case .blackhole: tex = Art.holeCore; sz = CGSize(width: 30, height: 30)
+        case .saw: tex = GunArts.sawBlade.texture("sawblade"); sz = CGSize(width: 22, height: 22)
         }
         node.texture = tex
-        node.size = CGSize(width: tex.size().width * 2, height: tex.size().height * 2)
+        node.size = sz
+        node.alpha = 1
         node.isHidden = false
         node.blendMode = kind == .plasma ? .add : .alpha
         node.position = p
@@ -402,6 +419,68 @@ extension GameScene {
                     } else { dead = true }
                 }
                 if pr.age > 1.6 { dead = true }
+            case .blackhole:
+                let b = a + pr.vel * dt
+                let h = trace(a, b, owner: pr.owner)
+                if case .none = h.target, pr.age < 0.85 {
+                    pr.pos = b
+                    if rng.chance(0.9) {
+                        particles.emit(a.x, a.y, vx: rng.range(-40, 40), vy: rng.range(-40, 40), life: 0.35,
+                                       color: rng.chance(0.5) ? SKColor(srgbRed: 0.75, green: 0.35, blue: 1, alpha: 1) : .black, size: 3, gravity: 0, drag: 2)
+                    }
+                } else {
+                    openSingularity(at: h.target.isNone ? b : h.point + h.normal * 6, owner: pr.owner)
+                    dead = true
+                }
+            case .saw:
+                if pr.stuck > 0 {
+                    // embedded: keep grinding sparks, then fade out
+                    pr.stuck -= dt
+                    pr.node.alpha = min(1, pr.stuck)
+                    if rng.chance(0.3) { particles.burst(pr.pos, n: 1, speed: 160, life: 0.25, color: .orange, size: 2) }
+                    if pr.stuck <= 0 { dead = true }
+                    break
+                }
+                pr.vel.y -= 260 * dt
+                let b = a + pr.vel * dt
+                let h = trace(a, b, owner: pr.age < 0.12 ? pr.owner : -1, skip: -1)
+                let def = Weapons.all[8]
+                switch h.target {
+                case .none:
+                    pr.pos = b
+                case .fighter(let id):
+                    // slices through fighters (once per pass)
+                    if pr.hitID != id {
+                        pr.hitID = id
+                        hurt(fighters[id], amount: def.damage, by: pr.owner, dir: pr.vel.normalized, knock: def.knock)
+                        particles.burst(h.point, n: 12, speed: 260, life: 0.4, color: fighters[id].color, size: 3, dir: pr.vel.normalized, cone: 0.9)
+                        Audio.shared.play(.saw, volume: 0.5, pan: pan(h.point))
+                    }
+                    pr.pos = b
+                case .element(let e) where level.elements[e].kind == .text && pr.cuts < 14:
+                    // cuts through text without slowing
+                    pr.cuts += 1
+                    knockLetter(e, at: h.point, dir: pr.vel.normalized)
+                    pr.pos = b
+                default:
+                    applyHit(h, dir: pr.vel.normalized, def: def, owner: pr.owner, damage: 12, power: .letter, carve: 4)
+                    particles.burst(h.point, n: 8, speed: 260, life: 0.3, color: SKColor(srgbRed: 1, green: 0.75, blue: 0.3, alpha: 1), size: 2, dir: h.normal, cone: 1.2)
+                    Audio.shared.play(.grind, volume: 0.45, pan: pan(h.point))
+                    if pr.bounces > 0, h.normal != .zero {
+                        pr.bounces -= 1
+                        pr.hitID = -1
+                        let n = h.normal
+                        let d = pr.vel.x * n.x + pr.vel.y * n.y
+                        pr.vel = CGPoint(x: (pr.vel.x - 2 * d * n.x) * 0.92, y: (pr.vel.y - 2 * d * n.y) * 0.92)
+                        pr.pos = h.point + n * 3
+                    } else {
+                        pr.pos = h.point; pr.stuck = 2.5
+                    }
+                }
+                if pr.pos.y < 8 && pr.stuck <= 0 { pr.pos.y = 8; pr.vel.y = abs(pr.vel.y) * 0.8; pr.bounces -= 1 }
+                if pr.pos.x < 8 || pr.pos.x > size.width - 8 { pr.vel.x = -pr.vel.x; pr.pos.x = clamp(pr.pos.x, 8, size.width - 8); pr.bounces -= 1 }
+                if pr.bounces < -1 && pr.stuck <= 0 { pr.stuck = 1 }
+                if pr.age > 5 { dead = true }
             case .grenade:
                 pr.vel.y -= 1500 * dt
                 pr.fuse -= dt
@@ -433,7 +512,12 @@ extension GameScene {
                 continue
             }
             pr.node.position = pr.pos
-            pr.node.zRotation = pr.kind == .grenade ? pr.node.zRotation - pr.vel.x * dt * 0.05 : atan2(pr.vel.y, pr.vel.x)
+            switch pr.kind {
+            case .grenade: pr.node.zRotation -= pr.vel.x * dt * 0.05
+            case .saw: if pr.stuck <= 0 { pr.node.zRotation -= dt * 38 * (pr.vel.x >= 0 ? 1 : -1) }
+            case .blackhole: pr.node.zRotation -= dt * 10
+            default: pr.node.zRotation = atan2(pr.vel.y, pr.vel.x)
+            }
             projectiles[i] = pr
             i += 1
         }
@@ -451,6 +535,7 @@ extension GameScene {
         var amount = amount
         // bots hit the player softer, by difficulty (the player has one life bar vs. several bots)
         if f.isPlayer && by >= 0 && by != f.id { amount *= [0.5, 0.7, 1.0][difficulty.rawValue] }
+        amount = absorbArmor(f, amount)
         f.hp -= amount
         f.hitFlash = 0.08
         f.hitKick = 1
@@ -471,4 +556,8 @@ extension GameScene {
 
     func shake(_ amount: CGFloat) { shakeAmp = max(shakeAmp, amount) }
     func hitStop(_ s: Double) { hitStopLeft = max(hitStopLeft, s) }
+}
+
+extension ShotTarget {
+    var isNone: Bool { if case .none = self { return true }; return false }
 }

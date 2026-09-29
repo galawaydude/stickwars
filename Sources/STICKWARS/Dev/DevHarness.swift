@@ -54,7 +54,7 @@ final class DevHarness {
     @MainActor private func exec(_ cmd: String, _ a: [String]) async -> String {
         switch cmd {
         case "fake":
-            fake = FakePage.image(size: scene.size)
+            fake = FakePage.image(size: scene.size, dark: a.first == "dark")
             return "fake \(fake!.width)x\(fake!.height)"
         case "play":
             if let img = fake {

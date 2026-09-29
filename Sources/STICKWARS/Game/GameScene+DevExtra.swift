@@ -33,9 +33,16 @@ extension GameScene {
             case .laser: laser(from: from, dir: dir, def: def, owner: -1)
             case .rocket: spawnProjectile(.rocket, at: from, vel: dir * def.speed, owner: -1)
             case .plasma: spawnProjectile(.plasma, at: from, vel: dir * def.speed, owner: -1, bounces: 3)
+            case .blackhole: spawnProjectile(.blackhole, at: from, vel: dir * def.speed, owner: -1)
+            case .saw: spawnProjectile(.saw, at: from, vel: dir * def.speed, owner: -1, bounces: 5)
+            case .lightning: lightning(from: from, dir: dir, def: def, owner: -1)
             }
             return "shot \(def.name)"
         case "synth": return Audio.shared.synthCheck()
+        case "armor":
+            player.armor = 100; return "armor 100"
+        case "knife":
+            player.input.aim = CGPoint(x: n(0), y: n(1)); slash(player); return "slash"
         case "killbot":
             let i = Int(n(0))
             guard i > 0, i < fighters.count else { return "no bot" }

@@ -68,7 +68,7 @@ enum AppIcon {
 
         // tracer from the gun to the blue fighter
         ctx.setStrokeColor(CGColor(srgbRed: 0.55, green: 0.97, blue: 1, alpha: 0.95)); ctx.setLineWidth(14); ctx.setLineCap(.butt)
-        ctx.move(to: CGPoint(x: 690, y: 603)); ctx.addLine(to: CGPoint(x: 775, y: 535)); ctx.strokePath()
+        ctx.move(to: CGPoint(x: 700, y: 614)); ctx.addLine(to: CGPoint(x: 775, y: 540)); ctx.strokePath()
 
         // blue fighter, knocked back
         let blue = CGColor(srgbRed: 0.23, green: 0.48, blue: 0.94, alpha: 1)
@@ -93,17 +93,11 @@ enum AppIcon {
                        (sh, CGPoint(x: 430, y: 560)), (CGPoint(x: 430, y: 560), CGPoint(x: 480, y: 565))],
               head: CGPoint(x: 370, y: 640), w: 42, headR: 52)
 
-        // pixel blaster (the game's own sprite), 11 pt per art pixel
-        let art = Weapons.all[5].art
-        let px7: CGFloat = 11
-        let gx = CGPoint(x: 480 - CGFloat(Weapons.all[5].grip.0) * px7, y: 565 + CGFloat(Weapons.all[5].grip.1) * px7)
-        for (row, line) in art.enumerated() {
-            for (col, ch) in line.enumerated() {
-                guard let c = Tex.palette[ch] else { continue }
-                ctx.setFillColor(CGColor(srgbRed: CGFloat(c.r) / 255, green: CGFloat(c.g) / 255, blue: CGFloat(c.b) / 255, alpha: 1))
-                ctx.fill(CGRect(x: gx.x + CGFloat(col) * px7, y: gx.y - CGFloat(row + 1) * px7, width: px7, height: px7))
-            }
-        }
+        // the game's own blaster (vector art), grip in the orange fighter's hand
+        let art = GunArts.blaster, gs: CGFloat = 5.2
+        let hgt = art.svg.size.height * gs
+        let origin = CGPoint(x: 480 - (art.grip.x + art.svg.pad) * gs, y: 565 - hgt + (art.grip.y + art.svg.pad) * gs)
+        art.svg.draw(in: ctx, scale: gs, height: hgt, origin: origin)
         ctx.restoreGState()
         return ctx.makeImage()!
     }
