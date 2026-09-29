@@ -223,7 +223,7 @@ final class DevHarness {
             if let ff = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"].first(where: { FileManager.default.fileExists(atPath: $0) }) {
                 let p = Process()
                 p.executableURL = URL(fileURLWithPath: ff)
-                p.arguments = ["-y", "-loglevel", "error", "-i", silent, "-i", wav.path, "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", path]
+                p.arguments = ["-nostdin", "-y", "-loglevel", "error", "-i", silent, "-i", wav.path, "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", path]
                 try p.run(); p.waitUntilExit()
                 muxed = p.terminationStatus == 0
             }

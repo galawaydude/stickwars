@@ -200,6 +200,8 @@ final class Audio {
         var L = [Float](repeating: 0, count: n), R = L
         func add(_ buf: [Float], at t: Double, gain: Float, pan: Float) {
             let start = Int(t * sr)
+            // sounds from just off-screen can have |pan| > 1: clamp, or sqrt goes NaN
+            let pan = pan.isFinite ? max(-1, min(1, pan)) : 0, gain = gain.isFinite ? gain : 0
             let gl = gain * sqrt(0.5 * (1 - pan)), gr = gain * sqrt(0.5 * (1 + pan))
             for i in 0..<buf.count where start + i >= 0 && start + i < n { L[start + i] += buf[i] * gl; R[start + i] += buf[i] * gr }
         }
@@ -225,7 +227,10 @@ final class Audio {
         // sound effects
         for (snd, vol, pan, at) in captured { add(cached(snd), at: at, gain: vol * 0.8, pan: pan) }
         // soft limiter
-        for i in 0..<n { L[i] = tanh(L[i] * 0.9); R[i] = tanh(R[i] * 0.9) }
+        for i in 0..<n {
+            L[i] = L[i].isFinite ? tanh(L[i] * 0.9) : 0
+            R[i] = R[i].isFinite ? tanh(R[i] * 0.9) : 0
+        }
         let fmt = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 2)!
         let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(n))!
         buf.frameLength = AVAudioFrameCount(n)
