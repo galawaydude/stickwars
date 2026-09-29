@@ -39,6 +39,9 @@ extension GameScene {
             }
             return "shot \(def.name)"
         case "synth": return Audio.shared.synthCheck()
+        case "stage":
+            if a.first == "off" { stage = nil }
+            return "stage \(stage.map { "\($0)" } ?? "off")"
         case "armor":
             player.armor = 100; return "armor 100"
         case "knife":

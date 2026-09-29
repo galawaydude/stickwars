@@ -358,7 +358,7 @@ final class HUD {
     func clearFeed() { for f in feed { f.node.removeFromParent() }; feed.removeAll() }
 
     func showBanner(_ text: String?, color: SKColor = .white, sub: String? = nil) {
-        guard let text else { banner.isHidden = true; bannerSub.isHidden = true; return }
+        guard let text, !cinematic else { banner.isHidden = true; bannerSub.isHidden = true; return }
         PixelFont.set(banner, text, scale: 10, color: color)
         banner.isHidden = false
         if let sub { PixelFont.set(bannerSub, sub, scale: 3, color: .white); bannerSub.isHidden = false } else { bannerSub.isHidden = true }

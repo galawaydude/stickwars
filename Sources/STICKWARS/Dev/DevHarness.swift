@@ -72,7 +72,13 @@ final class DevHarness {
                 do {
                     let front = NSWorkspace.shared.frontmostApplication?.localizedName ?? "Desktop"
                     let wins = ScreenCapture.windowList()
-                    let img = try await ScreenCapture.capture()
+                    var img = try await ScreenCapture.capture()
+                    // a capture during a Space switch / display wake can come back blank: retry
+                    for _ in 0..<4 where ScreenCapture.isBlank(img) {
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        img = try await ScreenCapture.capture()
+                    }
+                    if ScreenCapture.isBlank(img) { return "capture came back blank" }
                     fake = img
                     scene.realCaptureInDev = true
                     app.start(image: img, appName: front, windows: wins, headless: true)

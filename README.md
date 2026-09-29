@@ -19,7 +19,7 @@ It never touches your actual apps. It just takes one screenshot and fights on to
 
 ## what it looks like
 
-That's my real screen, Spotify sitting on top of X, about 9 seconds in. The letters are getting shot out
+That's my real screen, Spotify sitting on top of X, a few seconds in. The letters are getting shot out
 of the playlist names and the holes are where the screen got blown open, there's just black space behind it:
 
 ![fighting on spotify](docs/shot-9.jpg)
