@@ -20,8 +20,7 @@ It never touches your actual apps. It just takes one screenshot and fights on to
 ## what it looks like
 
 That's my real screen, Spotify sitting on top of X, about 9 seconds in. The letters are getting shot out
-of the playlist names and the purple holes are where the screen got blown open, you can see the pixel
-city behind it:
+of the playlist names and the holes are where the screen got blown open, there's just black space behind it:
 
 ![fighting on spotify](docs/shot-9.jpg)
 
@@ -51,7 +50,7 @@ And it works on anything. This one's a made-up desktop with a code editor, a blo
 - Deaths are ragdolls. They fly off and pile up with everything else.
 - Bots that path-find across the screen, pick weapons by range, go for health when they're hurt.
 - Free for all, first to 10 kills.
-- All the art (guns, icon, the city behind the screen) is drawn in code, and all the sounds are
+- All the art (guns, icon, the space behind the screen) is drawn in code, and all the sounds are
   synthesized. There are no image or audio files in the game.
 
 ## install
