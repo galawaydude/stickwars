@@ -1,4 +1,4 @@
-# STICKTOP
+# STICKWARS
 
 Press ⌥⇧F on any app. The screen freezes into a level: every word, icon, button and title bar is solid.
 Fight stick figures on it, shoot letters out one at a time, blow craters that reveal a pixel city behind
@@ -9,16 +9,16 @@ Native Swift + SpriteKit, no assets and no dependencies. macOS 14+, Apple Silico
 ## Build and run
 
 ```sh
-./build.sh                 # swift build -c release, assembles and ad hoc signs STICKTOP.app
-open STICKTOP.app          # menu-bar icon (figure.boxing)
+./build.sh                 # swift build -c release, assembles and ad hoc signs STICKWARS.app
+open STICKWARS.app          # menu-bar icon (figure.boxing)
 ```
 
-`build.sh` signs with a pinned designated requirement (`identifier "com.galawaydude.sticktop"`), so the
+`build.sh` signs with a pinned designated requirement (`identifier "com.galawaydude.stickwars"`), so the
 Screen Recording and Accessibility grants survive rebuilds.
 
 On first launch macOS asks for:
 
-- **Screen Recording** (required). The grant only applies after STICKTOP is quit and reopened.
+- **Screen Recording** (required). The grant only applies after STICKWARS is quit and reopened.
 - **Accessibility** (optional, recommended). Used only to read element frames for exact rectangles.
   Without it, elements come from pixel detection alone.
 
@@ -42,16 +42,16 @@ The menu has Play/Pause, New Match, Bots (0–5), Difficulty and Mute.
 ## Dev harness (headless, never shows the window)
 
 ```sh
-./dev.sh start                                   # runs STICKTOP.app --dev (no menu icon, no prompts)
+./dev.sh start                                   # runs STICKWARS.app --dev (no menu icon, no prompts)
 ./dev.sh fake play "step 600" state "snap lines" # synthetic page, simulate 5 s, dump state, PNG with ledges
 ./dev.sh "give rocket" "shoot 100 500 400 300" "blast 700 300 70" "perfblast 600" bots
 ./dev.sh stop
-STICKTOP.app/Contents/MacOS/STICKTOP --selfcheck # extraction, one-way collision, fracture
+STICKWARS.app/Contents/MacOS/STICKWARS --selfcheck # extraction, one-way collision, fracture
 ```
 
 Commands: `fake`, `play`, `pause`, `step N`, `perf N`, `perfblast N`, `snap [lines] [crop x y w h] [/path.png]`,
 `state`, `key CODE down|up`, `mouse X Y`, `click down|up`, `tp X Y`, `give N|NAME`, `shoot X1 Y1 X2 Y2`,
-`blast X Y R`, `grenade X Y VX VY`, `elements`, `bots`, `synth`. Results go to `/tmp/sticktop-out.txt`.
+`blast X Y R`, `grenade X Y VX VY`, `elements`, `bots`, `synth`. Results go to `/tmp/stickwars-out.txt`.
 Stepping drives `scene.update` and SpriteKit physics through `SKRenderer`, so it works with the display asleep.
 
 ## Layout

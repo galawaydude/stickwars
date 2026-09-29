@@ -55,7 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenu() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "figure.boxing", accessibilityDescription: "STICKTOP")
+        item.button?.image = NSImage(systemSymbolName: "figure.boxing", accessibilityDescription: "STICKWARS")
         let menu = NSMenu()
         menu.autoenablesItems = false
         let play = NSMenuItem(title: "Play", action: #selector(menuToggle), keyEquivalent: "f")
@@ -93,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(i)
         }
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit STICKTOP", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit STICKWARS", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
         statusItem = item
     }
@@ -183,8 +183,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showPermissionAlert() {
         NSApp.activate(ignoringOtherApps: true)
         let a = NSAlert()
-        a.messageText = "STICKTOP needs Screen Recording permission"
-        a.informativeText = "STICKTOP turns a still picture of your screen into the level. It never saves or sends the picture anywhere.\n\nEnable STICKTOP under System Settings › Privacy & Security › Screen & System Audio Recording, then quit and reopen STICKTOP (macOS applies the grant after a relaunch)."
+        a.messageText = "STICKWARS needs Screen Recording permission"
+        a.informativeText = "STICKWARS turns a still picture of your screen into the level. It never saves or sends the picture anywhere.\n\nEnable STICKWARS under System Settings › Privacy & Security › Screen & System Audio Recording, then quit and reopen STICKWARS (macOS applies the grant after a relaunch)."
         a.addButton(withTitle: "Open System Settings")
         a.addButton(withTitle: "Cancel")
         if a.runModal() == .alertFirstButtonReturn,

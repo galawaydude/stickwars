@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "STICKTOP",
+    name: "STICKWARS",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "STICKTOP",
-            path: "Sources/STICKTOP",
+            name: "STICKWARS",
+            path: "Sources/STICKWARS",
             swiftSettings: [.unsafeFlags(["-Ounchecked", "-wmo"], .when(configuration: .release))]
         )
     ]

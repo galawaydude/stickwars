@@ -4,10 +4,10 @@ import ImageIO
 import SpriteKit
 import UniformTypeIdentifiers
 
-/// Headless test driver. `kill -USR1 <pid>` runs the commands in /tmp/sticktop-cmd.txt and writes
-/// results to /tmp/sticktop-out.txt (ending with "DONE"). SIGUSR2 quits. Never shows the window.
+/// Headless test driver. `kill -USR1 <pid>` runs the commands in /tmp/stickwars-cmd.txt and writes
+/// results to /tmp/stickwars-out.txt (ending with "DONE"). SIGUSR2 quits. Never shows the window.
 final class DevHarness {
-    static let cmdPath = "/tmp/sticktop-cmd.txt", outPath = "/tmp/sticktop-out.txt"
+    static let cmdPath = "/tmp/stickwars-cmd.txt", outPath = "/tmp/stickwars-out.txt"
     private unowned let app: AppDelegate
     private var sources: [DispatchSourceSignal] = []
     private var fake: CGImage?
@@ -27,7 +27,7 @@ final class DevHarness {
             sources.append(s)
         }
         try? "READY \(getpid())\n".write(toFile: DevHarness.outPath, atomically: true, encoding: .utf8)
-        print("STICKTOP dev harness ready, pid \(getpid())")
+        print("STICKWARS dev harness ready, pid \(getpid())")
     }
 
     private var scene: GameScene { app.scene }
@@ -90,7 +90,7 @@ final class DevHarness {
             }
         case "snap":
             let lines = a.contains("lines")
-            let path = a.first(where: { $0.hasPrefix("/") }) ?? "/tmp/sticktop-snap.png"
+            let path = a.first(where: { $0.hasPrefix("/") }) ?? "/tmp/stickwars-snap.png"
             var crop: CGRect?
             if let k = a.firstIndex(of: "crop"), k + 4 < a.count {
                 crop = CGRect(x: num(a, k + 1), y: num(a, k + 2), width: num(a, k + 3), height: num(a, k + 4)) // scene points
