@@ -10,7 +10,7 @@ case "${1:-}" in
 start)
     [ -f $PIDFILE ] && kill -USR2 "$(cat $PIDFILE)" 2>/dev/null && sleep 0.5 || true
     rm -f $OUT
-    "$(dirname "$0")/STICKTOP.app/Contents/MacOS/STICKTOP" --dev >/tmp/sticktop-dev.log 2>&1 &
+    "$(dirname "$0")/STICKTOP.app/Contents/MacOS/STICKTOP" --dev ${DEV_ARGS:-} >/tmp/sticktop-dev.log 2>&1 &
     echo $! > $PIDFILE
     for _ in $(seq 50); do grep -q READY $OUT 2>/dev/null && break; sleep 0.1; done
     cat $OUT ;;

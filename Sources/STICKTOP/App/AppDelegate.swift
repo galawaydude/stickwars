@@ -34,7 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scene.app = self
         skView.presentScene(scene)
         skView.isPaused = true
-        Audio.shared.muted = settings.muted || dev
+        Audio.shared.muted = settings.muted || (dev && !CommandLine.arguments.contains("--audio"))
+        Audio.shared.silentTest = dev
 
         if dev {
             harness = DevHarness(app: self)

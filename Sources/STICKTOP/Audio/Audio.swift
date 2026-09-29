@@ -9,6 +9,8 @@ enum Sound: Int, CaseIterable {
 final class Audio {
     static let shared = Audio()
     var muted = false
+    /// Dev: run the whole audio path at zero volume (for crash testing without noise).
+    var silentTest = false
     private let sr: Double = 44100
     private var engine: AVAudioEngine?
     private var varispeed: AVAudioUnitVarispeed?
@@ -23,20 +25,27 @@ final class Audio {
     private func setup() -> Bool {
         if engine != nil { return true }
         let e = AVAudioEngine()
+        // players -> submix -> varispeed -> main mixer (varispeed has a single input bus)
+        let sub = AVAudioMixerNode()
         let vs = AVAudioUnitVarispeed()
-        e.attach(vs)
+        e.attach(sub); e.attach(vs)
+        e.connect(sub, to: vs, format: format)
         e.connect(vs, to: e.mainMixerNode, format: format)
         for _ in 0..<14 {
             let p = AVAudioPlayerNode()
             e.attach(p)
-            e.connect(p, to: vs, format: format)
+            e.connect(p, to: sub, format: format)
             players.append(p)
         }
         varispeed = vs
-        e.mainMixerNode.outputVolume = 0.55
+        e.mainMixerNode.outputVolume = silentTest ? 0 : 0.55
         buffers = Sound.allCases.map { buffer(synth($0)) }
         do { try e.start() } catch { return false }
         engine = e
+        // output device changed (headphones, AirPlay...): the engine stops; start it again
+        NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: e, queue: .main) { _ in
+            if !e.isRunning { try? e.start() }
+        }
         return true
     }
 
