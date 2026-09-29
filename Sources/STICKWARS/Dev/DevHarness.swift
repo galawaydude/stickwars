@@ -11,6 +11,7 @@ final class DevHarness {
     private unowned let app: AppDelegate
     private var sources: [DispatchSourceSignal] = []
     private var fake: CGImage?
+    private var fakeWindows: [WindowInfo] = []
     private var renderer: SKRenderer?
     private var vt = now()
     private var busy = false
@@ -54,11 +55,15 @@ final class DevHarness {
     @MainActor private func exec(_ cmd: String, _ a: [String]) async -> String {
         switch cmd {
         case "fake":
-            fake = FakePage.image(size: scene.size, dark: a.first == "dark")
+            if a.first == "desktop" {
+                fake = FakeDesktop.image(size: scene.size); fakeWindows = FakeDesktop.windows(size: scene.size)
+            } else {
+                fake = FakePage.image(size: scene.size, dark: a.first == "dark"); fakeWindows = FakePage.windows(size: scene.size)
+            }
             return "fake \(fake!.width)x\(fake!.height)"
         case "play":
             if let img = fake {
-                app.start(image: img, appName: "Safari", windows: FakePage.windows(size: scene.size), headless: true)
+                app.start(image: img, appName: "Safari", windows: fakeWindows, headless: true)
             } else {
                 do {
                     let img = try await ScreenCapture.capture()
@@ -68,6 +73,18 @@ final class DevHarness {
             let t0 = now()
             while scene.extracting, now() - t0 < 3 { try? await Task.sleep(nanoseconds: 5_000_000) }
             return "playing (headless) extraction \(String(format: "%.1f", scene.extractMs)) ms"
+        case "demo":
+            // player on autopilot against `n` bots (default 5)
+            scene.demo = true
+            scene.botOverride = Int(num(a, 0, 5))
+            scene.configureFighters()
+            if !scene.brains.contains(where: { $0.f === scene.player }) { scene.brains.append(Brain(scene.player)) }
+            scene.newMatch()
+            return "demo on, \(scene.fighters.count - 1) bots"
+        case "record":
+            let path = a.first(where: { $0.hasPrefix("/") }) ?? "/tmp/stickwars-demo.mp4"
+            let secs = Double(a.first(where: { Double($0) != nil }) ?? "30") ?? 30
+            return await record(path, seconds: secs)
         case "pause":
             app.pause(); return "paused"
         case "step":
@@ -118,6 +135,92 @@ final class DevHarness {
             vt += 1.0 / 120
             renderer!.update(atTime: vt)
         }
+    }
+
+    /// Records a demo reel: intro card, `seconds` of autopiloted gameplay, outro card.
+    @MainActor private func record(_ path: String, seconds: Double) async -> String {
+        let fps = 60, W = 1920, H = Int((1920 * scene.size.height / scene.size.width / 2).rounded()) * 2
+        let silent = path + ".video.mp4"
+        guard let rec = try? Recorder(path: silent, width: W, height: H, fps: fps) else { return "recorder failed" }
+        Audio.shared.resetCapture()
+        Audio.shared.captureClock = { Double(rec.frames) / Double(fps) }
+        defer { Audio.shared.captureClock = nil }
+        if renderer == nil { renderer = SKRenderer(device: MTLCreateSystemDefaultDevice()!); renderer!.scene = scene }
+        scene.isPaused = false
+        let t0 = now()
+        let desk = fake
+        // Intro: the untouched desktop, then the hotkey pops in.
+        for i in 0..<Int(1.8 * Double(fps)) {
+            let t = CGFloat(i) / CGFloat(fps)
+            rec.appendDrawn { ctx in
+                if let desk { ctx.interpolationQuality = .high; ctx.draw(desk, in: CGRect(x: 0, y: 0, width: W, height: H)) }
+                let k = t < 0.5 ? 0 : min(1, (t - 0.5) / 0.18)
+                if i == Int(0.5 * Double(fps)) { Audio.shared.play(.blip, volume: 0.8); Audio.shared.play(.pickup, volume: 0.6) }
+                if i == Int(1.55 * Double(fps)) { Audio.shared.play(.portal, volume: 0.8) }
+                if k > 0 {
+                    let c = CGPoint(x: CGFloat(W) / 2, y: CGFloat(H) / 2)
+                    let s = 150 * (0.8 + 0.2 * k) * (t > 1.2 ? 0.92 : 1)
+                    ctx.setFillColor(CGColor(gray: 0, alpha: 0.35 * k)); ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+                    Recorder.drawKey("⌥", center: CGPoint(x: c.x - s * 1.15, y: c.y), size: s, alpha: k)
+                    Recorder.drawKey("⇧", center: c, size: s, alpha: k)
+                    Recorder.drawKey("F", center: CGPoint(x: c.x + s * 1.15, y: c.y), size: s, alpha: k)
+                }
+            }
+        }
+        // Gameplay: showcase weapons on the player's autopilot, a few seconds each.
+        let showcase = [3, 7, 8, 9, 2, 6, 5]
+        let playerBrain = scene.brains.first { $0.f === scene.player }
+        let total = Int(seconds * Double(fps))
+        for i in 0..<total {
+            let sec = Double(i) / Double(fps)
+            let slot = showcase[min(showcase.count - 1, Int(sec / (seconds / Double(showcase.count))))]
+            if playerBrain?.lockedWeapon != slot { playerBrain?.lockedWeapon = slot; scene.player.input.switchTo = slot }
+            vt += 1.0 / Double(fps)
+            renderer!.update(atTime: vt)
+            rec.appendScene(renderer!, keep: i == total - 1)
+            if i % 30 == 0 { try? await Task.sleep(nanoseconds: 100_000) } // let background work (nav graph) land
+        }
+        let musicEnd = Double(rec.frames) / Double(fps)
+        Audio.shared.play(.win, volume: 0.9)
+        // Outro: fade the last frame to the logo.
+        let last = rec.lastFrame
+        let icon = AppIcon.image(512)
+        for i in 0..<Int(2.6 * Double(fps)) {
+            let t = CGFloat(i) / CGFloat(fps)
+            let k = min(1, t / 0.6)
+            rec.appendDrawn { ctx in
+                if let last { ctx.draw(last, in: CGRect(x: 0, y: 0, width: W, height: H)) }
+                ctx.setFillColor(CGColor(srgbRed: 0.04, green: 0.03, blue: 0.1, alpha: 0.92 * k)); ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+                let a = min(1, max(0, (t - 0.3) / 0.5))
+                ctx.setAlpha(a)
+                let s: CGFloat = 300
+                ctx.draw(icon, in: CGRect(x: CGFloat(W) / 2 - s / 2, y: CGFloat(H) / 2 - 20, width: s, height: s))
+                ctx.setAlpha(1)
+                Recorder.drawText("STICKWARS", size: 84, color: .white, center: CGPoint(x: CGFloat(W) / 2, y: CGFloat(H) / 2 - 70), alpha: a)
+                Recorder.drawText("Turn any screen into a stickman battlefield.  ⌥⇧F", size: 28, weight: .medium,
+                                  color: NSColor(white: 0.85, alpha: 1), center: CGPoint(x: CGFloat(W) / 2, y: CGFloat(H) / 2 - 140), alpha: a)
+                Recorder.drawText("github.com/galawaydude/stickwars", size: 24, weight: .regular,
+                                  color: NSColor(srgbRed: 0.55, green: 0.9, blue: 1, alpha: 1), center: CGPoint(x: CGFloat(W) / 2, y: CGFloat(H) / 2 - 190), alpha: a, mono: true)
+            }
+        }
+        await rec.finish()
+        // soundtrack: captured effects + beat, muxed with ffmpeg
+        let duration = Double(rec.frames) / Double(fps)
+        let wav = URL(fileURLWithPath: path + ".audio.wav")
+        var muxed = false
+        do {
+            try Audio.shared.writeCapture(duration: duration, musicFrom: 1.8, musicTo: musicEnd + 1.2, to: wav)
+            if let ff = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"].first(where: { FileManager.default.fileExists(atPath: $0) }) {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: ff)
+                p.arguments = ["-y", "-loglevel", "error", "-i", silent, "-i", wav.path, "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", path]
+                try p.run(); p.waitUntilExit()
+                muxed = p.terminationStatus == 0
+            }
+        } catch {}
+        if muxed { try? FileManager.default.removeItem(atPath: silent); try? FileManager.default.removeItem(at: wav) }
+        else { try? FileManager.default.moveItem(atPath: silent, toPath: path) }
+        return String(format: "recorded %@ (audio %@, %d sounds) ", path, muxed ? "yes" : "no", Audio.shared.captured.count) + String(format: "recorded %@ %dx%d %d frames (%.1f s video) in %.1f s", path, W, H, rec.frames, Double(rec.frames) / Double(fps), now() - t0)
     }
 
     private func perf(_ n: Int, each: ((Int) -> Void)? = nil) -> String {

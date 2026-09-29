@@ -48,7 +48,7 @@ extension GameScene {
 
     /// Makes the fighter list match the menu's bot count (player is always id 0).
     func configureFighters() {
-        let want = (app?.settings.bots ?? 3) + 1
+        let want = (botOverride ?? app?.settings.bots ?? 3) + 1
         while fighters.count > want {
             let f = fighters.removeLast()
             f.node.removeFromParent(); portals.removeLast().removeFromParent()

@@ -35,6 +35,8 @@ final class Brain {
     private var strafeDir: CGFloat = 1, strafeUntil = 0.0
     private var chargeGoal: CGFloat = 0.6
     private var coverNode = -1
+    /// Demo reels: keep this weapon instead of choosing by range.
+    var lockedWeapon: Int?
 
     init(_ f: Fighter) { self.f = f }
 
@@ -172,7 +174,7 @@ final class Brain {
             }
             if now >= weaponAt {
                 weaponAt = now + Double(rng.range(1.0, 2.0))
-                let w = chooseWeapon(dist: dist, below: T.pos.y < f.pos.y - 40)
+                let w = lockedWeapon ?? chooseWeapon(dist: dist, below: T.pos.y < f.pos.y - 40)
                 if w != f.weapons.current { inp.switchTo = w }
             }
             let canFire = hasLOS && seenSince >= 0 && now - seenSince > skill.reaction && dist < def.range * 0.85
