@@ -11,6 +11,19 @@ struct WindowInfo {
 }
 
 enum ScreenCapture {
+    /// True when the image is (nearly) one flat colour, e.g. a capture without permission in effect.
+    static func isBlank(_ img: CGImage) -> Bool {
+        let w = 64, h = 40
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w, space: CGColorSpaceCreateDeviceGray(),
+                                  bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return false }
+        ctx.interpolationQuality = .low
+        ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let p = ctx.data?.assumingMemoryBound(to: UInt8.self) else { return false }
+        var lo: UInt8 = 255, hi: UInt8 = 0
+        for i in 0..<(w * h) { lo = min(lo, p[i]); hi = max(hi, p[i]) }
+        return Int(hi) - Int(lo) < 10
+    }
+
     private static var cachedFilter: SCContentFilter?
 
     /// Front-to-back list of visible windows not owned by us.
