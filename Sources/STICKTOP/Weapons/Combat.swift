@@ -61,6 +61,7 @@ extension GameScene {
             belt.current = inp.switchTo
             belt.cooldown = max(belt.cooldown, 0.12)
             f.rig.setWeapon(belt.current)
+            f.switchT = 0
             if f.isPlayer { Audio.shared.play(.blip, volume: 0.4) }
         }
         let def = belt.def
@@ -78,6 +79,7 @@ extension GameScene {
         }
         s = belt.slots[belt.current]
         if inp.reload, def.mag > 0, s.ammo < def.mag, s.reloadLeft <= 0 { s.reloadLeft = def.reload }
+        if s.reloadLeft > 0 && f.weapons.slots[belt.current].reloadLeft <= 0 { magDrop(f) }
 
         let ready = belt.cooldown <= 0 && s.reloadLeft <= 0 && !s.overheated
         if def.kind == .charge {
@@ -93,7 +95,8 @@ extension GameScene {
                 return
             }
         } else {
-            let want = def.auto ? inp.fire : inp.firePressed
+            // hold to keep firing, every weapon (semi-autos repeat at their fire rate)
+            let want = inp.fire || inp.firePressed
             if want && ready {
                 if def.mag > 0 && s.ammo <= 0 {
                     s.reloadLeft = def.reload
@@ -117,26 +120,59 @@ extension GameScene {
 
     private func aimDir(_ f: Fighter) -> CGPoint { (f.input.aim - f.shoulder).normalized }
 
+    /// Light bullet magnetism for the player: bends the shot up to ~4° toward an enemy near the crosshair.
+    private func aimAssist(_ f: Fighter, _ dir: CGPoint) -> CGPoint {
+        var best = dir, bestA: CGFloat = 0.07
+        for o in fighters where o.alive && o.id != f.id {
+            let to = o.center - f.muzzle
+            let l = to.length
+            guard l < 1000, l > 1 else { continue }
+            let n = to * (1 / l)
+            let a = acos(clamp(n.x * dir.x + n.y * dir.y, -1, 1))
+            if a < bestA { bestA = a; best = n }
+        }
+        return (dir * 0.35 + best * 0.65).normalized
+    }
+
+    /// Empty magazine drops out of the gun.
+    func magDrop(_ f: Fighter) {
+        particles.emit(f.shoulder.x + f.facing * 8, f.shoulder.y - 6, vx: rng.range(-40, 40), vy: rng.range(20, 80), life: 1.0,
+                       color: SKColor(white: 0.3, alpha: 1), size: 4, gravity: 1400, drag: 0.5)
+        if f.isPlayer { Audio.shared.play(.empty, volume: 0.35) }
+    }
+
     func fire(_ f: Fighter, charge: CGFloat) {
         var belt = f.weapons
         let def = belt.def
         var s = belt.slots[belt.current]
-        if def.mag > 0 { s.ammo -= 1; if s.ammo <= 0 { s.reloadLeft = def.reload } }
+        if def.mag > 0 { s.ammo -= 1; if s.ammo <= 0 { s.reloadLeft = def.reload; magDrop(f) } }
         if def.heat > 0 { s.heat += def.heat; if s.heat >= 1 { s.overheated = true } }
         s.charge = 0
         belt.slots[belt.current] = s
         belt.cooldown = def.interval
         f.weapons = belt
 
-        let dir = aimDir(f)
+        var dir = aimDir(f)
         let m = f.muzzle
+        if f.isPlayer && def.kind != .rocket { dir = aimAssist(f, dir) }
         let recoil = def.recoil * (def.kind == .charge ? (0.5 + charge * 2.5) : 1)
         f.vel.x -= dir.x * recoil
         if !f.grounded || dir.y < -0.5 { f.vel.y -= dir.y * recoil * 0.6 }
         f.recoilKick = def.kind == .rocket || def.pellets > 1 || charge > 0.5 ? 0.45 : 0.18
         Audio.shared.play(def.sound, volume: f.isPlayer ? 0.8 : 0.45, pan: pan(m))
-        fx.spawn(Art.flash, at: m, size: CGSize(width: 14, height: 10), rotation: atan2(dir.y, dir.x), life: 0.05,
-                 anchor: CGPoint(x: 0.05, y: 0.5), z: 4)
+        // muzzle flash sized to the weapon, a puff of smoke, and a spent casing
+        let big: CGFloat = def.pellets > 1 || def.kind == .rocket || charge > 0.5 ? 1.8 : def.kind == .laser ? 1.4 : 1.1
+        fx.spawn(Art.flash, at: m, size: CGSize(width: 16 * big, height: 12 * big), rotation: atan2(dir.y, dir.x), life: 0.05,
+                 anchor: CGPoint(x: 0.05, y: 0.5), z: 4, add: true)
+        for _ in 0..<(def.pellets > 1 || def.kind == .rocket ? 5 : 2) {
+            particles.emit(m.x, m.y, vx: dir.x * rng.range(20, 90) + rng.range(-20, 20), vy: dir.y * rng.range(20, 90) + rng.range(10, 50),
+                           life: rng.range(0.35, 0.7), color: SKColor(white: rng.range(0.7, 0.9), alpha: 1), size: rng.chance(0.5) ? 3 : 4, gravity: -60, drag: 3)
+        }
+        if def.kind == .hitscan || def.kind == .charge {
+            let back = -f.facing
+            particles.emit(f.shoulder.x, f.shoulder.y + 2, vx: back * rng.range(60, 140), vy: rng.range(140, 260), life: 0.9,
+                           color: SKColor(srgbRed: 1, green: 0.8, blue: 0.3, alpha: 1), size: 2, gravity: 1400, drag: 0.5)
+        }
         if f.isPlayer { shake(def.shake) }
 
         switch def.kind {
@@ -412,8 +448,15 @@ extension GameScene {
 
     func hurt(_ f: Fighter, amount: CGFloat, by: Int, dir: CGPoint, knock: CGFloat) {
         guard f.alive, simTime >= f.invulnUntil else { return }
+        var amount = amount
+        // bots hit the player softer, by difficulty (the player has one life bar vs. several bots)
+        if f.isPlayer && by >= 0 && by != f.id { amount *= [0.5, 0.7, 1.0][difficulty.rawValue] }
         f.hp -= amount
         f.hitFlash = 0.08
+        f.hitKick = 1
+        f.hitDirX = dir.x >= 0 ? 1 : -1
+        if f.isPlayer { hud.hurt() }
+        if by == player.id && !f.isPlayer { hud.markHit() }
         f.vel.x += dir.x * knock
         f.vel.y += max(0, dir.y) * knock + knock * 0.4
         if knock > 0 { f.grounded = false }

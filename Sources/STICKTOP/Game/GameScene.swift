@@ -27,7 +27,9 @@ final class GameScene: SKScene {
     let projectileRoot = SKNode()
     var projectiles: [Projectile] = []
     var projectilePool: [SKSpriteNode] = []
-    let crosshair = SKSpriteNode(texture: Art.crosshair)
+    let ragdolls = Ragdolls()
+    let cinema: Cinema
+    var streak = 0, streakAt = -10.0
     var shakeAmp: CGFloat = 0
     var hitStopLeft = 0.0
     var scratch: [Int] = []
@@ -58,6 +60,8 @@ final class GameScene: SKScene {
     // Input state
     var keysDown = Set<UInt16>()
     var mouse = CGPoint(x: 400, y: 400)
+    /// Mouse in view coordinates (real input). Re-projected every frame because the camera moves.
+    var mouseView: CGPoint?
     var mouseDown = false
     private var pendingJump = false, pendingDown = false, pendingFire = false, pendingRelease = false
     private var pendingGrenade = false, pendingReload = false, pendingSwitch = -1
@@ -75,6 +79,7 @@ final class GameScene: SKScene {
         _ = [Art.rocket, Art.plasma, Art.grenade, Art.flash, Art.blast, Art.crosshair, Art.medkit] + Art.portalFrames
         Tex.packAtlas()
         hud = HUD(size: size)
+        cinema = Cinema(size: size)
         super.init(size: size)
         scaleMode = .fill
         anchorPoint = .zero
@@ -85,16 +90,21 @@ final class GameScene: SKScene {
         world.zPosition = 10
         hudRoot.zPosition = 1000
         physicsRoot.zPosition = 5
-        addChild(backdrop); addChild(canvasRoot); addChild(physicsRoot); addChild(world); addChild(hudRoot)
+        addChild(backdrop); addChild(canvasRoot); addChild(physicsRoot); addChild(world)
+        // HUD rides on the camera so slow-mo zooms never move it
+        addChild(cinema.cam)
+        camera = cinema.cam
+        cinema.cam.addChild(hudRoot)
+        hudRoot.position = CGPoint(x: -size.width / 2, y: -size.height / 2)
+        hudRoot.addChild(cinema.barTop); hudRoot.addChild(cinema.barBottom); hudRoot.addChild(cinema.flash)
         physicsRoot.addChild(statics.root)
         physicsRoot.addChild(debris.root)
+        ragdolls.root.zPosition = 8
+        physicsRoot.addChild(ragdolls.root)
         particles.node.zPosition = 40
         fx.node.zPosition = 45
         projectileRoot.zPosition = 30
         world.addChild(particles.node); world.addChild(fx.node); world.addChild(projectileRoot)
-        crosshair.size = CGSize(width: 22, height: 22)
-        crosshair.zPosition = 500
-        hudRoot.addChild(crosshair)
         hudRoot.addChild(hud.root)
         physicsWorld.gravity = CGVector(dx: 0, dy: -14)
         physicsWorld.speed = 1
@@ -140,6 +150,8 @@ final class GameScene: SKScene {
         canvasRoot.addChild(c.node)
         statics.clear()
         debris.clear()
+        ragdolls.clear(physicsWorld)
+        cinema.reset()
         particles.clear()
         fx.clear()
         clearProjectiles()
@@ -206,6 +218,7 @@ final class GameScene: SKScene {
         f.spawnPoint = nil
         f.rig.setWeapon(f.weapons.current)
         f.rig.root.zRotation = 0
+        f.flipT = 1; f.hitKick = 0; f.switchT = 1
     }
 
     func didPause() {
@@ -221,11 +234,16 @@ final class GameScene: SKScene {
         var dt = lastTime == 0 ? fixedDT : currentTime - lastTime
         lastTime = currentTime
         dt = clamp(dt, 0, 0.1)
+        let realDt = dt
+        // slow-motion scales everything: fixed steps, animation, particles and physics
+        let ts = cinema.update(realDt)
+        dt *= Double(ts)
         if hitStopLeft > 0 {
-            hitStopLeft -= dt
+            hitStopLeft -= realDt
             physicsWorld.speed = 0
             dt = 0
-        } else if physicsWorld.speed == 0 { physicsWorld.speed = 1 }
+        } else { physicsWorld.speed = ts }
+        if let c = canvas, c.smooth != cinema.zoomed { c.smooth = cinema.zoomed }
         acc += dt
         var steps = 0
         while acc >= fixedDT - 1e-6, steps < 8 {
@@ -234,7 +252,7 @@ final class GameScene: SKScene {
             steps += 1
         }
         if steps == 8 { acc = 0 }
-        frameUpdate(dt)
+        frameUpdate(dt, realDt: realDt)
         canvas?.flush()
         frameMs = (now() - t0) * 1000
         fpsFrames += 1
@@ -269,15 +287,32 @@ final class GameScene: SKScene {
         for f in fighters { f.input.clearEdges() }
     }
 
-    func frameUpdate(_ dt: Double) {
+    func frameUpdate(_ dt: Double, realDt: Double) {
         let fdt = CGFloat(dt)
+        if let mv = mouseView, view != nil { mouse = convertPoint(fromView: mv) }
         for f in fighters {
             f.node.position = CGPoint(x: f.pos.x.rounded(), y: f.pos.y.rounded())
             f.hitFlash = max(0, f.hitFlash - fdt)
             f.recoilKick = max(0, f.recoilKick - fdt * 6)
             f.muzzle = f.rig.update(f, dt: fdt)
-            if f.alive { debris.nudge(f.bodyRect, vx: f.vel.x) }
+            guard f.alive else { continue }
+            debris.nudge(f.bodyRect, vx: f.vel.x)
+            // speed lines when flung fast (rocket jumps, blasts, knockback)
+            let sp = f.vel.length
+            if sp > 700 && rng.chance(0.7) {
+                let o = CGPoint(x: rng.range(-8, 8), y: rng.range(10, 50))
+                fx.line(f.pos + o, f.pos + o - f.vel.normalized * min(60, sp * 0.05), width: 1.5, color: SKColor(white: 1, alpha: 0.7), life: 0.12)
+            }
+            // HP bar over bots once hurt; bobbing arrow over the player
+            if !f.isPlayer {
+                let show = f.hp < 99.5
+                if f.hpBack.isHidden == show { f.hpBack.isHidden = !show; f.hpFill.isHidden = !show }
+                if show { f.hpFill.xScale = max(0.001, f.hp / 100) }
+            } else {
+                f.marker.position.y = 94 + (sin(CGFloat(simTime) * 5) * 2).rounded()
+            }
         }
+        ragdolls.update(time: simTime, world: physicsWorld)
         particles.update(fdt)
         fx.update(fdt)
         debris.update(time: simTime, dt: fdt)
@@ -288,8 +323,7 @@ final class GameScene: SKScene {
             world.position = CGPoint(x: (rng.range(-1, 1) * shakeAmp).rounded(), y: (rng.range(-1, 1) * shakeAmp).rounded())
             shakeAmp *= CGFloat(exp(-12 * dt))
         } else if world.position != .zero { world.position = .zero; shakeAmp = 0 }
-        crosshair.position = CGPoint(x: mouse.x.rounded(), y: mouse.y.rounded())
-        updateHUD(dt)
+        hud.update(self, realDt: CGFloat(realDt), crosshairAt: convert(mouse, to: hudRoot))
         if showDebug {
             debugTimer -= dt
             if debugTimer <= 0 {

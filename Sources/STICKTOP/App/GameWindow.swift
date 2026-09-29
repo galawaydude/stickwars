@@ -39,8 +39,10 @@ final class GameView: SKView {
     // All input goes straight to the game scene (SKView doesn't forward every event type).
     private var game: GameScene? { scene as? GameScene }
     private func point(_ e: NSEvent) -> CGPoint {
+        let v = convert(e.locationInWindow, from: nil)
+        game?.mouseView = v
         guard let s = scene else { return .zero }
-        return s.convertPoint(fromView: convert(e.locationInWindow, from: nil))
+        return s.convertPoint(fromView: v)
     }
     override func keyDown(with e: NSEvent) { game?.key(e.keyCode, down: true, isRepeat: e.isARepeat) }
     override func keyUp(with e: NSEvent) { game?.key(e.keyCode, down: false) }

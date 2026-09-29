@@ -36,6 +36,12 @@ extension GameScene {
             }
             return "shot \(def.name)"
         case "synth": return Audio.shared.synthCheck()
+        case "killbot":
+            let i = Int(n(0))
+            guard i > 0, i < fighters.count else { return "no bot" }
+            fighters[i].hitDirX = 1; fighters[i].vel = CGPoint(x: 400, y: 300)
+            kill(fighters[i], by: 0)
+            return "killed \(fighters[i].name)"
         case "bots":
             var out = "nav nodes=\(nav.nodes.count) edges=\(nav.edges.reduce(0) { $0 + $1.count })\n"
             for b in brains { out += b.debug(self) + "\n" }

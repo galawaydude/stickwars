@@ -14,6 +14,8 @@ final class Canvas {
     private var dirty: [Bool]
     private var dirtyList: [Int] = []
     private(set) var lastFlushCount = 0
+    /// Linear filtering while the camera is zoomed (nearest looks uneven at non-integer scales).
+    var smooth = false { didSet { for t in tiles { t.filteringMode = smooth ? .linear : .nearest } } }
 
     init(image: CGImage, pointSize: CGSize) {
         pw = image.width; ph = image.height

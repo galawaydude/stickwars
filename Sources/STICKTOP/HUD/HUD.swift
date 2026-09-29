@@ -1,22 +1,42 @@
 import SpriteKit
 
-/// Pixel HUD: top-left panel (app, kills, HP, jet), scores, bottom hotbar, kill feed, banner.
+/// Pixel HUD. Scoreboard across the top centre, the player's card (weapon, ammo, HP, jet,
+/// grenades) bottom-left with the weapon strip above it, kill feed top-right, plus crosshair
+/// with hit markers, damage vignette, kill callouts, respawn countdown and the win banner.
 final class HUD {
     let root = SKNode()
     private let size: CGSize
-    private let panel = SKSpriteNode()
-    private let appLabel = SKSpriteNode(), killsLabel = SKSpriteNode(), hpLabel = SKSpriteNode()
-    private let hpBack = SKSpriteNode(texture: Tex.white), hpFill = SKSpriteNode(texture: Tex.white)
+    // top
+    private let appLabel = SKSpriteNode()
+    private let scorePanel = SKSpriteNode(), scoreSub = SKSpriteNode()
+    private var scoreHeads: [SKSpriteNode] = [], scoreNums: [SKSpriteNode] = []
+    private let scoreMark = SKSpriteNode(texture: Tex.white)
+    // player card
+    private let card = SKSpriteNode()
+    private let weaponIcon = SKSpriteNode(), weaponName = SKSpriteNode(), ammoLabel = SKSpriteNode()
+    private let heatBack = SKSpriteNode(texture: Tex.white), heatFill = SKSpriteNode(texture: Tex.white)
+    private let hpLabel = SKSpriteNode()
+    private let hpBack = SKSpriteNode(texture: Tex.white), hpFill = SKSpriteNode(texture: Tex.white), hpGhost = SKSpriteNode(texture: Tex.white)
     private let jetBack = SKSpriteNode(texture: Tex.white), jetFill = SKSpriteNode(texture: Tex.white)
-    private var scoreLabels: [SKSpriteNode] = []
-    private var slots: [SKSpriteNode] = [], icons: [SKSpriteNode] = [], numbers: [SKSpriteNode] = []
+    private var grenadeIcons: [SKSpriteNode] = []
+    private var slots: [SKSpriteNode] = [], slotIcons: [SKSpriteNode] = []
     private let selector = SKSpriteNode()
-    private let ammoLabel = SKSpriteNode(), grenadeLabel = SKSpriteNode()
+    // centre
+    let crosshair = SKSpriteNode(texture: Art.crosshair)
+    private let hitMarker = SKSpriteNode(), crossAmmo = SKSpriteNode()
+    private var hitT: CGFloat = 0, killMarkT: CGFloat = 0
+    private let vignette = SKSpriteNode()
+    private var hurtT: CGFloat = 0
+    private let calloutLabel = SKSpriteNode()
+    private var calloutT: CGFloat = 9
+    private let respawnLabel = SKSpriteNode()
     private let banner = SKSpriteNode(), bannerSub = SKSpriteNode()
     private struct FeedLine { let node: SKNode; let until: Double }
     private var feed: [FeedLine] = []
-    // cached shown values (avoid rebuilding strings every frame)
-    private var shown = (app: "", kills: -1, hp: -1, weapon: -1, ammo: -1, grenades: -1, scores: -1)
+    private var clock: CGFloat = 0
+    private var ghostHP: CGFloat = 100
+    // cached shown values (strings are only rebuilt on change)
+    private var shown = (app: "", hp: -1, weapon: -1, ammo: -1, grenades: -1, scores: -1, respawn: -1, crossAmmo: -1)
 
     static func panelTexture(_ w: Int, _ h: Int, border: SKColor = SKColor(white: 0.75, alpha: 1), fill: CGFloat = 0.62, inner: CGFloat = 0.08) -> SKTexture {
         Tex.drawn("panel\(w)x\(h)\(border.hashValue)\(fill)\(inner)", w, h, nearest: true) { c in
@@ -30,130 +50,246 @@ final class HUD {
         }
     }
 
-    init(size: CGSize) {
-        self.size = size
-        let H = size.height
-        panel.texture = HUD.panelTexture(130, 50)
-        panel.size = CGSize(width: 260, height: 100)
-        panel.anchorPoint = CGPoint(x: 0, y: 1)
-        panel.position = CGPoint(x: 12, y: H - 12)
-        root.addChild(panel)
-        for (n, y) in [(appLabel, H - 30), (killsLabel, H - 54), (hpLabel, H - 78)] {
-            n.anchorPoint = CGPoint(x: 0, y: 0.5); n.position = CGPoint(x: 26, y: y); n.zPosition = 1; root.addChild(n)
+    private static var vignetteTexture: SKTexture {
+        Tex.drawn("vignette", 128, 80) { c in
+            let g = CGGradient(colorsSpace: sRGB, colors: [CGColor(srgbRed: 0.9, green: 0, blue: 0, alpha: 0), CGColor(srgbRed: 0.9, green: 0.02, blue: 0.02, alpha: 0.9)] as CFArray, locations: [0.55, 1])!
+            c.scaleBy(x: 1, y: 80.0 / 128.0)
+            c.drawRadialGradient(g, startCenter: CGPoint(x: 64, y: 64), startRadius: 0, endCenter: CGPoint(x: 64, y: 64), endRadius: 78, options: .drawsAfterEndLocation)
         }
-        for (b, f, y, h) in [(hpBack, hpFill, H - 78, CGFloat(10)), (jetBack, jetFill, H - 96, CGFloat(4))] {
-            b.anchorPoint = CGPoint(x: 0, y: 0.5); f.anchorPoint = CGPoint(x: 0, y: 0.5)
-            b.size = CGSize(width: 140, height: h + 4); f.size = CGSize(width: 136, height: h)
-            b.position = CGPoint(x: 112, y: y); f.position = CGPoint(x: 114, y: y)
-            b.color = SKColor(white: 0.08, alpha: 1); b.colorBlendFactor = 1
-            f.colorBlendFactor = 1; b.zPosition = 1; f.zPosition = 2
-            root.addChild(b); root.addChild(f)
-        }
-        jetBack.position.x = 26; jetFill.position.x = 28
-        jetBack.size.width = 226; jetFill.size.width = 222
-        jetFill.color = SKColor(srgbRed: 0.35, green: 0.9, blue: 1, alpha: 1)
-
-        // hotbar
-        let n = Weapons.all.count, slotW: CGFloat = 64, gap: CGFloat = 4
-        let total = CGFloat(n) * slotW + CGFloat(n - 1) * gap
-        let x0 = size.width / 2 - total / 2
-        for i in 0..<n {
-            let s = SKSpriteNode(texture: HUD.panelTexture(29, 29, border: SKColor(white: 0.5, alpha: 1), fill: 0.7, inner: 0.2))
-            s.size = CGSize(width: slotW, height: slotW)
-            s.position = CGPoint(x: x0 + slotW / 2 + CGFloat(i) * (slotW + gap), y: 14 + slotW / 2)
-            root.addChild(s); slots.append(s)
-            let t = Weapons.texture(i)
-            let sc: CGFloat = t.size().width * 2 <= slotW - 8 ? 2 : 1
-            let ic = SKSpriteNode(texture: t, size: CGSize(width: t.size().width * sc, height: t.size().height * sc))
-            ic.position = s.position + CGPoint(x: 0, y: -2); ic.zPosition = 2
-            root.addChild(ic); icons.append(ic)
-            let num = PixelFont.label("\(i + 1)", scale: 2, color: SKColor(white: 0.8, alpha: 1))
-            num.anchorPoint = CGPoint(x: 0, y: 1)
-            num.position = s.position + CGPoint(x: -slotW / 2 + 5, y: slotW / 2 - 4); num.zPosition = 3
-            root.addChild(num); numbers.append(num)
-        }
-        selector.texture = HUD.panelTexture(31, 31, border: SKColor(srgbRed: 0.35, green: 0.95, blue: 1, alpha: 1), fill: 0.7, inner: 0.28)
-        selector.size = CGSize(width: slotW + 4, height: slotW + 4)
-        selector.zPosition = 1
-        root.addChild(selector)
-        ammoLabel.anchorPoint = CGPoint(x: 0.5, y: 0); ammoLabel.position = CGPoint(x: size.width / 2, y: 14 + slotW + 8)
-        grenadeLabel.anchorPoint = CGPoint(x: 0, y: 0.5); grenadeLabel.position = CGPoint(x: x0 + total + 12, y: 14 + slotW / 2)
-        root.addChild(ammoLabel); root.addChild(grenadeLabel)
-
-        banner.position = CGPoint(x: size.width / 2, y: size.height / 2 + 40); banner.zPosition = 20; banner.isHidden = true
-        bannerSub.position = CGPoint(x: size.width / 2, y: size.height / 2 - 30); bannerSub.zPosition = 20; bannerSub.isHidden = true
-        root.addChild(banner); root.addChild(bannerSub)
     }
 
-    func update(_ s: GameScene) {
+    private func bar(_ b: SKSpriteNode, _ f: SKSpriteNode, at p: CGPoint, w: CGFloat, h: CGFloat, color: SKColor) {
+        b.anchorPoint = CGPoint(x: 0, y: 0.5); f.anchorPoint = CGPoint(x: 0, y: 0.5)
+        b.size = CGSize(width: w + 4, height: h + 4); f.size = CGSize(width: w, height: h)
+        b.position = p; f.position = p + CGPoint(x: 2, y: 0)
+        b.color = SKColor(srgbRed: 0.04, green: 0.04, blue: 0.06, alpha: 1); b.colorBlendFactor = 1
+        f.color = color; f.colorBlendFactor = 1
+        b.zPosition = 1; f.zPosition = 3
+        root.addChild(b); root.addChild(f)
+    }
+
+    init(size: CGSize) {
+        self.size = size
+        let W = size.width, H = size.height
+
+        appLabel.anchorPoint = CGPoint(x: 0, y: 1); appLabel.position = CGPoint(x: 16, y: H - 12); appLabel.alpha = 0.85
+        root.addChild(appLabel)
+        scorePanel.anchorPoint = CGPoint(x: 0.5, y: 1); scorePanel.position = CGPoint(x: W / 2, y: H - 10)
+        root.addChild(scorePanel)
+        PixelFont.set(scoreSub, "FIRST TO \(GameScene.scoreLimit)", scale: 2, color: SKColor(white: 0.85, alpha: 1))
+        scoreSub.anchorPoint = CGPoint(x: 0.5, y: 1); scoreSub.zPosition = 2
+        root.addChild(scoreSub)
+        scoreMark.color = SKColor(srgbRed: 1, green: 0.85, blue: 0.3, alpha: 1); scoreMark.colorBlendFactor = 1
+        scoreMark.size = CGSize(width: 34, height: 3); scoreMark.zPosition = 3
+        root.addChild(scoreMark)
+
+        // player card, bottom-left
+        let cardW: CGFloat = 330, cardH: CGFloat = 96, x0: CGFloat = 16, y0: CGFloat = 16
+        card.texture = HUD.panelTexture(Int(cardW / 2), Int(cardH / 2), border: SKColor(white: 0.55, alpha: 1), fill: 0.55, inner: 0.1)
+        card.size = CGSize(width: cardW, height: cardH); card.anchorPoint = .zero; card.position = CGPoint(x: x0, y: y0)
+        root.addChild(card)
+        weaponIcon.anchorPoint = CGPoint(x: 0, y: 0.5); weaponIcon.position = CGPoint(x: x0 + 14, y: y0 + 68); weaponIcon.zPosition = 2
+        weaponName.anchorPoint = CGPoint(x: 0, y: 0.5); weaponName.position = CGPoint(x: x0 + 82, y: y0 + 74); weaponName.zPosition = 2
+        ammoLabel.anchorPoint = CGPoint(x: 1, y: 0.5); ammoLabel.position = CGPoint(x: x0 + cardW - 14, y: y0 + 70); ammoLabel.zPosition = 2
+        for n in [weaponIcon, weaponName, ammoLabel] { root.addChild(n) }
+        bar(heatBack, heatFill, at: CGPoint(x: x0 + 82, y: y0 + 60), w: 110, h: 4, color: .orange)
+        hpLabel.anchorPoint = CGPoint(x: 0, y: 0.5); hpLabel.position = CGPoint(x: x0 + 14, y: y0 + 36); hpLabel.zPosition = 2
+        root.addChild(hpLabel)
+        bar(hpBack, hpFill, at: CGPoint(x: x0 + 70, y: y0 + 36), w: 244, h: 14, color: .green)
+        hpGhost.anchorPoint = CGPoint(x: 0, y: 0.5); hpGhost.size = CGSize(width: 244, height: 14); hpGhost.position = hpFill.position
+        hpGhost.color = SKColor(white: 1, alpha: 0.9); hpGhost.colorBlendFactor = 1; hpGhost.zPosition = 2
+        root.addChild(hpGhost)
+        bar(jetBack, jetFill, at: CGPoint(x: x0 + 70, y: y0 + 16), w: 150, h: 5, color: SKColor(srgbRed: 0.35, green: 0.9, blue: 1, alpha: 1))
+        let jl = PixelFont.label("JET", scale: 2, color: SKColor(srgbRed: 0.35, green: 0.9, blue: 1, alpha: 1))
+        jl.anchorPoint = CGPoint(x: 0, y: 0.5); jl.position = CGPoint(x: x0 + 14, y: y0 + 16); jl.zPosition = 2
+        root.addChild(jl)
+        for i in 0..<Weapons.grenadeMax {
+            let g = SKSpriteNode(texture: Art.grenade, size: CGSize(width: 12, height: 14))
+            g.position = CGPoint(x: x0 + 250 + CGFloat(i) * 20, y: y0 + 16); g.zPosition = 2
+            root.addChild(g); grenadeIcons.append(g)
+        }
+
+        // weapon strip above the card
+        let sw: CGFloat = 44, gap: CGFloat = 3
+        for i in 0..<Weapons.all.count {
+            let s = SKSpriteNode(texture: HUD.panelTexture(22, 16, border: SKColor(white: 0.4, alpha: 1), fill: 0.6, inner: 0.12))
+            s.size = CGSize(width: sw, height: 32); s.anchorPoint = .zero
+            s.position = CGPoint(x: x0 + CGFloat(i) * (sw + gap), y: y0 + cardH + 6)
+            root.addChild(s); slots.append(s)
+            let t = Weapons.texture(i)
+            let ic = SKSpriteNode(texture: t, size: t.size())
+            ic.position = s.position + CGPoint(x: sw / 2 + 3, y: 14); ic.zPosition = 2
+            root.addChild(ic); slotIcons.append(ic)
+            let num = PixelFont.label("\(i + 1)", scale: 2, color: SKColor(white: 0.85, alpha: 1))
+            num.anchorPoint = CGPoint(x: 0, y: 1); num.position = s.position + CGPoint(x: 4, y: 29); num.zPosition = 3
+            root.addChild(num)
+        }
+        selector.texture = HUD.panelTexture(24, 18, border: SKColor(srgbRed: 0.35, green: 0.95, blue: 1, alpha: 1), fill: 0.7, inner: 0.25)
+        selector.size = CGSize(width: sw + 4, height: 36); selector.anchorPoint = .zero; selector.zPosition = 1
+        root.addChild(selector)
+
+        // centre elements
+        crosshair.size = CGSize(width: 33, height: 33); crosshair.zPosition = 50
+        root.addChild(crosshair)
+        hitMarker.texture = Tex.pixels("hitmark", ["w.......w", ".w.....w.", "..w...w..", ".........", ".........", ".........",
+                                                   "..w...w..", ".w.....w.", "w.......w"])
+        hitMarker.size = CGSize(width: 36, height: 36); hitMarker.zPosition = 51; hitMarker.alpha = 0; hitMarker.colorBlendFactor = 1
+        root.addChild(hitMarker)
+        crossAmmo.anchorPoint = CGPoint(x: 0.5, y: 1); crossAmmo.zPosition = 51
+        root.addChild(crossAmmo)
+        vignette.texture = HUD.vignetteTexture; vignette.size = CGSize(width: W, height: H); vignette.anchorPoint = .zero
+        vignette.zPosition = -3; vignette.alpha = 0
+        root.addChild(vignette)
+        calloutLabel.position = CGPoint(x: W / 2, y: H * 0.72); calloutLabel.zPosition = 20; calloutLabel.isHidden = true
+        respawnLabel.position = CGPoint(x: W / 2, y: H / 2 + 60); respawnLabel.zPosition = 20; respawnLabel.isHidden = true
+        banner.position = CGPoint(x: W / 2, y: H / 2 + 40); banner.zPosition = 20; banner.isHidden = true
+        bannerSub.position = CGPoint(x: W / 2, y: H / 2 - 30); bannerSub.zPosition = 20; bannerSub.isHidden = true
+        for n in [calloutLabel, respawnLabel, banner, bannerSub] { root.addChild(n) }
+    }
+
+    // MARK: per frame
+
+    func update(_ s: GameScene, realDt: CGFloat, crosshairAt cp: CGPoint) {
+        clock += realDt
         let p = s.player!
-        if s.appName != shown.app { shown.app = s.appName; PixelFont.set(appLabel, String(s.appName.prefix(18)).uppercased(), scale: 2, color: .white) }
-        if p.kills != shown.kills {
-            shown.kills = p.kills
-            PixelFont.set(killsLabel, "KILLS \(p.kills) / FIRST TO \(GameScene.scoreLimit)", scale: 2, color: SKColor(srgbRed: 1, green: 0.85, blue: 0.3, alpha: 1))
+        if s.appName != shown.app {
+            shown.app = s.appName
+            PixelFont.set(appLabel, "> " + String(s.appName.prefix(20)).uppercased(), scale: 2, color: .white)
         }
-        let hp = max(0, Int(p.hp.rounded()))
-        if hp != shown.hp {
-            shown.hp = hp
-            PixelFont.set(hpLabel, "HP \(hp)", scale: 2, color: .white)
-            hpFill.xScale = CGFloat(hp) / 100
-            hpFill.color = hp > 60 ? SKColor(srgbRed: 0.3, green: 0.9, blue: 0.4, alpha: 1) : hp > 30 ? SKColor(srgbRed: 1, green: 0.8, blue: 0.2, alpha: 1) : SKColor(srgbRed: 1, green: 0.25, blue: 0.2, alpha: 1)
-        }
-        jetFill.xScale = max(0.001, p.jetFuel)
 
-        // scores (compact, under the panel)
-        var sc = s.fighters.count
-        for f in s.fighters { sc = sc &* 31 &+ f.kills }
-        if sc != shown.scores {
-            shown.scores = sc
-            while scoreLabels.count < s.fighters.count {
-                let l = SKSpriteNode(); l.anchorPoint = CGPoint(x: 0, y: 0.5); root.addChild(l); scoreLabels.append(l)
+        // scoreboard
+        var key = s.fighters.count
+        for f in s.fighters { key = key &* 31 &+ f.kills }
+        if key != shown.scores {
+            shown.scores = key
+            while scoreHeads.count < s.fighters.count {
+                let h = SKSpriteNode(texture: Tex.circle, size: CGSize(width: 14, height: 14)); h.colorBlendFactor = 1; h.zPosition = 2
+                let n = SKSpriteNode(); n.anchorPoint = CGPoint(x: 0, y: 0.5); n.zPosition = 2
+                root.addChild(h); root.addChild(n); scoreHeads.append(h); scoreNums.append(n)
             }
-            var x: CGFloat = 16
-            for (i, l) in scoreLabels.enumerated() {
-                guard i < s.fighters.count else { l.isHidden = true; continue }
+            let entry: CGFloat = 70, count = CGFloat(s.fighters.count)
+            let w = entry * count + 16
+            scorePanel.texture = HUD.panelTexture(Int(w / 2), 22, border: SKColor(white: 0.5, alpha: 1), fill: 0.55, inner: 0.1)
+            scorePanel.size = CGSize(width: w, height: 44)
+            scoreSub.position = CGPoint(x: size.width / 2, y: size.height - 60)
+            let best = s.fighters.map(\.kills).max() ?? 0
+            for (i, h) in scoreHeads.enumerated() {
+                let vis = i < s.fighters.count
+                h.isHidden = !vis; scoreNums[i].isHidden = !vis
+                guard vis else { continue }
                 let f = s.fighters[i]
-                l.isHidden = false
-                PixelFont.set(l, "\(f.name) \(f.kills)", scale: 2, color: f.color.blended(withFraction: 0.3, of: .white) ?? f.color)
-                l.position = CGPoint(x: x, y: size.height - 126)
-                x += l.size.width + 12
+                let x = size.width / 2 - w / 2 + 8 + entry * CGFloat(i) + 16
+                h.position = CGPoint(x: x, y: size.height - 32); h.color = f.color
+                PixelFont.set(scoreNums[i], "\(f.kills)", scale: 3, color: f.kills == best && best > 0 ? SKColor(srgbRed: 1, green: 0.85, blue: 0.3, alpha: 1) : .white)
+                scoreNums[i].position = CGPoint(x: x + 14, y: size.height - 32)
+                if f.isPlayer { scoreMark.position = CGPoint(x: x + 12, y: size.height - 46) }
             }
         }
 
-        // hotbar
+        // weapon, ammo, heat
         let w = p.weapons.current
+        let st = p.weapons.slots[w], def = p.weapons.def
         if w != shown.weapon {
             shown.weapon = w
-            selector.position = slots[w].position
-            for (i, ic) in icons.enumerated() { ic.alpha = i == w ? 1 : 0.55 }
+            let t = Weapons.texture(w)
+            weaponIcon.texture = t; weaponIcon.size = CGSize(width: t.size().width * 2, height: t.size().height * 2)
+            PixelFont.set(weaponName, def.name, scale: 2, color: SKColor(srgbRed: 0.6, green: 0.95, blue: 1, alpha: 1))
+            selector.position = slots[w].position - CGPoint(x: 2, y: 2)
+            for (i, ic) in slotIcons.enumerated() { ic.alpha = i == w ? 1 : 0.5 }
+            heatBack.isHidden = def.heat == 0; heatFill.isHidden = def.heat == 0
         }
-        let st = p.weapons.slots[w], def = p.weapons.def
-        // integer key of everything the ammo line shows, so the string is only built on change
-        let key = w | st.ammo << 4 | (st.reloadLeft > 0 ? 1 : 0) << 12 | Int(st.heat * 100) << 13 | (st.overheated ? 1 : 0) << 21
-            | (st.charging ? 1 : 0) << 22 | Int(st.charge * 100) << 23
-        if key != shown.ammo {
-            shown.ammo = key
-            var ammo: String
-            if st.reloadLeft > 0 { ammo = "\(def.name)  RELOADING" }
-            else if def.mag > 0 { ammo = "\(def.name)  \(st.ammo)/\(def.mag)" }
-            else { ammo = st.overheated ? "\(def.name)  OVERHEAT" : "\(def.name)  HEAT \(Int(st.heat * 100))%" }
-            if def.kind == .charge && st.charging { ammo = "\(def.name)  CHARGE \(Int(st.charge * 100))%" }
-            PixelFont.set(ammoLabel, ammo, scale: 2, color: st.overheated || st.reloadLeft > 0 ? .orange : .white)
+        let akey = w | st.ammo << 4 | (st.reloadLeft > 0 ? 1 : 0) << 12 | (st.overheated ? 1 : 0) << 13 | (st.charging ? 1 : 0) << 14 | Int(st.charge * 20) << 15
+        if akey != shown.ammo {
+            shown.ammo = akey
+            let text: String
+            if st.reloadLeft > 0 { text = "RELOAD" }
+            else if def.mag > 0 { text = "\(st.ammo)/\(def.mag)" }
+            else if st.overheated { text = "HOT!" }
+            else if st.charging { text = "\(Int(st.charge * 100))%" }
+            else { text = "OK" }
+            let low = def.mag > 0 && st.ammo * 4 <= def.mag
+            PixelFont.set(ammoLabel, text, scale: 3, color: st.reloadLeft > 0 || st.overheated || low ? .orange : .white)
         }
-        if p.weapons.grenades != shown.grenades {
-            shown.grenades = p.weapons.grenades
-            PixelFont.set(grenadeLabel, "GRENADES \(p.weapons.grenades)", scale: 2, color: SKColor(srgbRed: 0.6, green: 1, blue: 0.6, alpha: 1))
+        if def.heat > 0 {
+            heatFill.xScale = max(0.001, min(1, st.heat))
+            heatFill.color = st.overheated ? .red : .orange
         }
 
+        // HP with a white "ghost" bar that drains after hits
+        let hp = max(0, p.hp)
+        if Int(hp) != shown.hp {
+            shown.hp = Int(hp)
+            PixelFont.set(hpLabel, "\(Int(hp.rounded()))", scale: 3, color: .white)
+            hpFill.xScale = max(0.001, hp / 100)
+            hpFill.color = hp > 60 ? SKColor(srgbRed: 0.3, green: 0.9, blue: 0.4, alpha: 1) : hp > 30 ? SKColor(srgbRed: 1, green: 0.8, blue: 0.2, alpha: 1) : SKColor(srgbRed: 1, green: 0.25, blue: 0.2, alpha: 1)
+            if hp > ghostHP { ghostHP = hp }
+        }
+        ghostHP = max(hp, ghostHP - realDt * 60)
+        hpGhost.xScale = max(0.001, ghostHP / 100)
+        jetFill.xScale = max(0.001, p.jetFuel)
+        if p.weapons.grenades != shown.grenades {
+            shown.grenades = p.weapons.grenades
+            for (i, g) in grenadeIcons.enumerated() { g.alpha = i < p.weapons.grenades ? 1 : 0.2 }
+        }
+
+        // crosshair, hit marker, low-ammo hint
+        crosshair.position = CGPoint(x: cp.x.rounded(), y: cp.y.rounded())
+        hitT = max(0, hitT - realDt * 5); killMarkT = max(0, killMarkT - realDt * 2.5)
+        hitMarker.position = crosshair.position
+        hitMarker.alpha = max(hitT, killMarkT)
+        hitMarker.color = killMarkT > 0 ? SKColor(srgbRed: 1, green: 0.25, blue: 0.2, alpha: 1) : .white
+        hitMarker.setScale(1 + max(hitT, killMarkT) * 0.3)
+        let lowAmmo = st.reloadLeft > 0 ? 1 : (def.mag > 0 && st.ammo * 4 <= def.mag ? 2 : st.overheated ? 3 : 0)
+        let ckey = lowAmmo << 8 | st.ammo
+        if ckey != shown.crossAmmo {
+            shown.crossAmmo = ckey
+            crossAmmo.isHidden = lowAmmo == 0
+            if lowAmmo != 0 {
+                PixelFont.set(crossAmmo, lowAmmo == 1 ? "RELOADING" : lowAmmo == 3 ? "OVERHEAT" : "\(st.ammo)", scale: 2, color: .orange)
+            }
+        }
+        crossAmmo.position = crosshair.position - CGPoint(x: 0, y: 22)
+
+        // damage vignette + low HP pulse
+        hurtT = max(0, hurtT - realDt * 2.5)
+        let low: CGFloat = p.alive && hp < 35 ? 0.35 + 0.2 * sin(clock * 6) : 0
+        vignette.alpha = max(hurtT * 0.8, low)
+
+        // respawn countdown
+        let left = p.alive || s.matchOver ? -1 : max(0, Int((p.respawnAt - s.simTime).rounded(.up)))
+        if left != shown.respawn {
+            shown.respawn = left
+            respawnLabel.isHidden = left < 0
+            if left >= 0 { PixelFont.set(respawnLabel, left > 0 ? "RESPAWN IN \(left)" : "GO!", scale: 5, color: .white) }
+        }
+
+        // callout pop
+        calloutT += realDt
+        if calloutT < 1.3 {
+            calloutLabel.isHidden = false
+            calloutLabel.setScale(calloutT < 0.12 ? 1.7 - calloutT / 0.12 * 0.7 : 1)
+            calloutLabel.alpha = calloutT > 1.0 ? (1.3 - calloutT) / 0.3 : 1
+        } else { calloutLabel.isHidden = true }
+
         // kill feed fade
-        let t = s.simTime
         var i = 0
         while i < feed.count {
-            let left = feed[i].until - t
-            if left <= 0 { feed[i].node.removeFromParent(); feed.remove(at: i); continue }
-            feed[i].node.alpha = min(1, CGFloat(left))
+            let l = feed[i].until - s.simTime
+            if l <= 0 { feed[i].node.removeFromParent(); feed.remove(at: i); continue }
+            feed[i].node.alpha = min(1, CGFloat(l))
             i += 1
         }
+    }
+
+    // MARK: events
+
+    func markHit() { hitT = 1 }
+    func markKill() { killMarkT = 1 }
+    func hurt() { hurtT = 1 }
+
+    func callout(_ text: String, color: SKColor) {
+        PixelFont.set(calloutLabel, text, scale: 6, color: color.blended(withFraction: 0.25, of: .white) ?? color)
+        calloutT = 0
     }
 
     func addKill(killer: Fighter?, victim: Fighter, weapon: Int, time: Double) {

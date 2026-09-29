@@ -4,6 +4,7 @@ enum PhysCat {
     static let debris: UInt32 = 1 << 0
     static let statics: UInt32 = 1 << 1
     static let edge: UInt32 = 1 << 2
+    static let ragdoll: UInt32 = 1 << 3
 }
 
 /// Rigid-body debris: pieces of the snapshot flying and piling with SpriteKit physics.
@@ -46,7 +47,7 @@ final class DebrisSystem {
         }
         let b = body ?? SKPhysicsBody(rectangleOf: CGSize(width: max(2, r.width - 0.5), height: max(2, r.height - 0.5)))
         b.categoryBitMask = PhysCat.debris
-        b.collisionBitMask = PhysCat.debris | PhysCat.statics | PhysCat.edge
+        b.collisionBitMask = PhysCat.debris | PhysCat.statics | PhysCat.edge | PhysCat.ragdoll
         b.contactTestBitMask = 0
         b.friction = 0.6
         b.restitution = 0.2

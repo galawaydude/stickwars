@@ -59,6 +59,13 @@ final class Fighter {
     // one-frame events for FX/sound
     var evJump = false, evLand: CGFloat = 0, evWallJump = false
     var hitFlash: CGFloat = 0
+    // animation triggers read (and decayed) by the rig at frame rate
+    var flipT: CGFloat = 1        // < 1 while front-flipping
+    var hitKick: CGFloat = 0, hitDirX: CGFloat = 0
+    var switchT: CGFloat = 1
+    var landKick: CGFloat = 0
+    let hpBack = SKSpriteNode(texture: Tex.white), hpFill = SKSpriteNode(texture: Tex.white)
+    let marker = SKSpriteNode()
     var muzzle = CGPoint.zero
     var recoilKick: CGFloat = 0
 
@@ -75,6 +82,17 @@ final class Fighter {
         tag.zPosition = 30
         node.addChild(rig.root)
         node.addChild(tag)
+        // small HP bar over bots, pixel arrow over the player
+        for (b, w, c) in [(hpBack, CGFloat(30), SKColor(white: 0.05, alpha: 0.8)), (hpFill, CGFloat(28), color)] {
+            b.size = CGSize(width: w, height: b === hpBack ? 6 : 4); b.anchorPoint = CGPoint(x: 0, y: 0.5)
+            b.position = CGPoint(x: -15 + (b === hpFill ? 1 : 0), y: 88); b.color = c; b.colorBlendFactor = 1
+            b.zPosition = 30; b.isHidden = true; node.addChild(b)
+        }
+        if isPlayer {
+            let t = Tex.pixels("youarrow", ["kkkkkkk", "kyyyyyk", ".kyyyk.", "..kyk..", "...k..."])
+            marker.texture = t; marker.size = CGSize(width: 14, height: 10); marker.position = CGPoint(x: 0, y: 94)
+            marker.zPosition = 31; node.addChild(marker)
+        }
         node.zPosition = 20 + CGFloat(id) * 0.5
     }
 
@@ -108,7 +126,7 @@ final class Fighter {
             else if wallTimer > 0 && lastWall != 0 {
                 vel.x = -CGFloat(lastWall) * Move.wallJumpX; vel.y = Move.wallJumpY
                 wallTimer = 0; evWallJump = true; facing = -CGFloat(lastWall)
-            } else if airJumps > 0 { vel.y = Move.doubleJump; airJumps -= 1; evJump = true }
+            } else if airJumps > 0 { vel.y = Move.doubleJump; airJumps -= 1; evJump = true; flipT = 0 }
             else { jumpBuffer = Move.buffer }
         } else if jumpBuffer > 0 && grounded { groundJump() }
 
@@ -173,7 +191,7 @@ final class Fighter {
                 if prevY >= top - 0.01, py <= top, top > best { best = top; floor = false }
             }
             if best > -CGFloat.greatestFiniteMagnitude {
-                if !wasGrounded { evLand = -vel.y }
+                if !wasGrounded { evLand = -vel.y; landKick = max(landKick, evLand) }
                 pos.y = best; vel.y = 0; grounded = true; groundY = best; groundIsFloor = floor
                 airJumps = 1
             }

@@ -90,19 +90,39 @@ extension GameScene {
         guard f.alive else { return }
         f.alive = false
         f.deaths += 1
-        f.respawnAt = simTime + 2
+        f.respawnAt = simTime + 2.2
         f.spawnPoint = nil
-        f.rig.spin = rng.range(6, 12) * (f.vel.x >= 0 ? -1 : 1)
-        f.vel.y = max(f.vel.y, 350)
         f.grounded = false
+        // the body goes limp and flies with the hit
+        let v = CGVector(dx: f.vel.x * 0.7 + f.hitDirX * 260, dy: max(f.vel.y * 0.6, 0) + 260)
+        ragdolls.spawn(f.rig.bones(in: physicsRoot), front: f.rig.colors.0, back: f.rig.colors.1, vel: v,
+                       spin: -f.hitDirX * rng.range(4, 9), world: physicsWorld, time: simTime)
+        f.node.isHidden = true
         let k: Fighter? = killer >= 0 && killer < fighters.count ? fighters[killer] : nil
         if let k, k !== f { k.kills += 1 } else { f.kills = max(0, f.kills - 1) }
         hud.addKill(killer: k, victim: f, weapon: k?.weapons.current ?? 0, time: simTime)
-        particles.burst(f.center, n: 26, speed: 340, life: 0.7, color: f.color, size: 3)
+        particles.burst(f.center, n: 22, speed: 320, life: 0.7, color: f.color, size: 3)
         Audio.shared.play(k?.isPlayer == true ? .kill : .death, volume: 0.7, pan: pan(f.pos))
-        shake(f.isPlayer || k?.isPlayer == true ? 7 : 3)
-        hitStop(f.isPlayer || k?.isPlayer == true ? 0.08 : 0.03)
-        if let k, k.kills >= GameScene.scoreLimit, !matchOver {
+        let playerInvolved = f.isPlayer || k?.isPlayer == true
+        shake(playerInvolved ? 7 : 3)
+        hitStop(playerInvolved ? 0.06 : 0.02)
+        let final = k.map { $0 !== f && $0.kills >= GameScene.scoreLimit } ?? false
+        // slow-motion shots on the moments that matter
+        if final {
+            cinema.slowMo(2.2, scale: 0.18, at: f.center, zoom: 1.45, force: true)
+            cinema.impactFlash(0.5)
+        } else if k?.isPlayer == true && k !== f {
+            cinema.slowMo(0.8, scale: 0.3, at: f.center, zoom: 1.28)
+            cinema.impactFlash(0.3)
+            hud.markKill()
+            if simTime - streakAt < 3.5 { streak += 1 } else { streak = 1 }
+            streakAt = simTime
+            hud.callout(["KILL", "DOUBLE KILL", "TRIPLE KILL", "QUAD KILL", "RAMPAGE"][min(streak - 1, 4)], color: player.color)
+        } else if f.isPlayer {
+            cinema.slowMo(1.0, scale: 0.3, at: f.center, zoom: 1.25)
+            streak = 0
+        }
+        if final, !matchOver {
             matchOver = true
             matchOverAt = simTime
             bannerLeft = 4
@@ -125,12 +145,6 @@ extension GameScene {
                 }
                 continue
             }
-            // ragdoll-ish tumble, then fade
-            f.vel.y -= 2200 * fdt
-            f.pos = f.pos + f.vel * fdt
-            if f.pos.y < 0 { f.pos.y = 0; f.vel.y = -f.vel.y * 0.3; f.vel.x *= 0.6; f.rig.spin *= 0.5 }
-            f.pos.x = clamp(f.pos.x, 0, size.width)
-            f.node.alpha = CGFloat(clamp((f.respawnAt - 0.8 - simTime) / 1.0, 0, 1))
             // portal opens 0.6 s before the respawn
             if simTime >= f.respawnAt - 0.6, !extracting {
                 if f.spawnPoint == nil {
@@ -146,7 +160,6 @@ extension GameScene {
             if simTime >= f.respawnAt, !extracting, !matchOver || f.spawnPoint != nil {
                 spawn(f, at: f.spawnPoint ?? spawnPoint())
                 f.invulnUntil = simTime + 2
-                f.rig.spin = 0
             }
         }
         if !portals.isEmpty { for (i, p) in portals.enumerated() where fighters[i].alive && !p.isHidden { p.texture = Art.portalFrames[Int(simTime * 12) % 3] } }
@@ -239,5 +252,4 @@ extension GameScene {
         fx.setVelocity(s, CGPoint(x: rng.range(-20, 20), y: 70))
     }
 
-    func updateHUD(_ dt: Double) { hud.update(self) }
 }

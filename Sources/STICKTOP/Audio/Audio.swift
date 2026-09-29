@@ -11,6 +11,9 @@ final class Audio {
     var muted = false
     private let sr: Double = 44100
     private var engine: AVAudioEngine?
+    private var varispeed: AVAudioUnitVarispeed?
+    /// Playback rate (slow-motion lowers pitch and speed together).
+    var rate: Float = 1 { didSet { if abs(rate - oldValue) > 0.005 { varispeed?.rate = rate } } }
     private var players: [AVAudioPlayerNode] = []
     private var buffers: [AVAudioPCMBuffer] = []
     private var lastStart = [Double](repeating: 0, count: Sound.allCases.count)
@@ -20,12 +23,16 @@ final class Audio {
     private func setup() -> Bool {
         if engine != nil { return true }
         let e = AVAudioEngine()
+        let vs = AVAudioUnitVarispeed()
+        e.attach(vs)
+        e.connect(vs, to: e.mainMixerNode, format: format)
         for _ in 0..<14 {
             let p = AVAudioPlayerNode()
             e.attach(p)
-            e.connect(p, to: e.mainMixerNode, format: format)
+            e.connect(p, to: vs, format: format)
             players.append(p)
         }
+        varispeed = vs
         e.mainMixerNode.outputVolume = 0.55
         buffers = Sound.allCases.map { buffer(synth($0)) }
         do { try e.start() } catch { return false }
