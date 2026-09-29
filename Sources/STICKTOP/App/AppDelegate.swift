@@ -14,7 +14,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var harness: DevHarness?
     private(set) var playing = false
     private var starting = false
-    private var transitioning = false
     private var lastToggle = 0.0
     private var prevApp: NSRunningApplication?
     private var cursorHidden = false
@@ -119,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func toggle() {
         let t = now()
-        guard t - lastToggle > 0.3, !transitioning else { return }
+        guard t - lastToggle > 0.3 else { return }
         lastToggle = t
         if playing { pause() } else { play() }
     }
@@ -159,13 +158,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         playItem?.title = "Pause"
         guard !headless else { return }
         window.setFrame(NSScreen.screens[0].frame, display: false)
-        setTransparent(true)
-        transitioning = true
-        // Melt the new frame in over the (dimmed) desktop; the fight resumes when it lands.
-        scene.startMelt(out: false) { [weak self] in
-            self?.setTransparent(false)
-            self?.transitioning = false
-        }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         window.makeFirstResponder(skView)
@@ -173,33 +165,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !cursorHidden { NSCursor.hide(); cursorHidden = true }
     }
 
-    /// See-through window while a melt shows the desktop behind it.
-    private func setTransparent(_ on: Bool) {
-        skView.allowsTransparency = on
-        window.isOpaque = !on
-        window.backgroundColor = on ? .clear : .black
-    }
-
     func pause() {
-        guard playing, !transitioning else { return }
+        guard playing else { return }
         playing = false
         playItem?.title = "Play"
-        Audio.shared.stopAll()
+        skView.isPaused = true
         scene.didPause()
+        Audio.shared.stopAll()
         if cursorHidden { NSCursor.unhide(); cursorHidden = false }
-        guard window.isVisible else { skView.isPaused = true; return }
-        // Freeze everyone where they are and melt the frame away, DOOM style.
-        transitioning = true
-        window.ignoresMouseEvents = true
-        setTransparent(true)
-        prevApp?.activate()
-        scene.startMelt(out: true) { [weak self] in
-            guard let self else { return }
-            self.skView.isPaused = true
-            self.window.orderOut(nil)
-            self.window.ignoresMouseEvents = false
-            self.setTransparent(false)
-            self.transitioning = false
+        if window.isVisible {
+            window.orderOut(nil)
+            prevApp?.activate()
         }
     }
 

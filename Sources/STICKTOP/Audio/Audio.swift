@@ -2,7 +2,7 @@ import AVFoundation
 
 enum Sound: Int, CaseIterable {
     case pistol, smg, shotgun, rocket, plasma, blaster, charge, laser, explosion, shatter, pop, jump, land, hit, kill,
-         pickup, blip, reload, empty, grenade, bounce, portal, win, death, melt
+         pickup, blip, reload, empty, grenade, bounce, portal, win, death
 }
 
 /// Synthesized sounds played through a round-robin pool of player nodes. The only singleton.
@@ -148,7 +148,6 @@ final class Audio {
         case .bounce: return sweep(0.05, 500, 300, decay: 60, gain: 0.35)
         case .portal: return mix(sweep(0.5, 200, 1200, decay: 4, wave: 1, gain: 0.12), sweep(0.5, 400, 2400, decay: 5, gain: 0.25))
         case .win: return mix(sweep(0.15, 523, 523, decay: 6, wave: 1, gain: 0.2), shifted(sweep(0.15, 659, 659, decay: 6, wave: 1, gain: 0.2), by: 0.15), shifted(sweep(0.4, 784, 784, decay: 4, wave: 1, gain: 0.2), by: 0.3))
-        case .melt: return mix(sweep(0.9, 220, 45, decay: 2.5, wave: 2, gain: 0.3), noise(0.9, cutoff: 0.06, decay: 3, gain: 0.7))
         case .death: return mix(sweep(0.4, 400, 60, decay: 7, wave: 1, gain: 0.25), noise(0.2, cutoff: 0.3, decay: 20, gain: 0.5))
         }
     }
