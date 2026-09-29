@@ -54,7 +54,7 @@ final class HUD {
         jetFill.color = SKColor(srgbRed: 0.35, green: 0.9, blue: 1, alpha: 1)
 
         // hotbar
-        let n = Weapons.all.count, slotW: CGFloat = 58, gap: CGFloat = 4
+        let n = Weapons.all.count, slotW: CGFloat = 64, gap: CGFloat = 4
         let total = CGFloat(n) * slotW + CGFloat(n - 1) * gap
         let x0 = size.width / 2 - total / 2
         for i in 0..<n {

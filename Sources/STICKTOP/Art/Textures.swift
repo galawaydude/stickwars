@@ -12,7 +12,7 @@ enum Tex {
         "s": RGBA(206, 212, 224), "w": RGBA(255, 255, 255), "c": RGBA(90, 235, 255), "b": RGBA(40, 120, 255),
         "n": RGBA(20, 60, 170), "y": RGBA(255, 214, 64), "o": RGBA(255, 140, 40), "r": RGBA(232, 58, 58),
         "p": RGBA(70, 30, 110), "m": RGBA(150, 70, 220), "v": RGBA(38, 14, 64), "e": RGBA(60, 200, 90),
-        "h": RGBA(120, 255, 190),
+        "h": RGBA(120, 255, 190), "a": RGBA(150, 250, 255),
     ]
 
     /// Makes an sRGB CGImage from a premultiplied RGBA8 buffer (row 0 = top).
