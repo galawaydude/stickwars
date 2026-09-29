@@ -1,43 +1,79 @@
 import SpriteKit
 
-/// Demo-reel director: picks camera shots around the hero (wide, tracking, close-up when enemies
-/// are near), with an opening close-up on the hero's portal. Only runs when `demo` is on.
+/// Demo-reel director, follow-cam style: the camera stays locked on one fighter (the "star").
+/// When the star is killed, the kill plays in slow-mo and the camera hands over to the killer.
+/// It opens on the player's portal and ends with a finale by whoever is the star at the time.
 struct DirectorState {
     var start = 0.0
-    var shotUntil = 0.0
-    var shot = 0            // 0 wide, 1 tracking, 2 close
-    var lastHeroKills = 0
+    var star = 0                 // fighter id the camera follows
+    var pendingStar: Int?        // killer taking over after the kill beat
+    var switchAt = 0.0
+    var lastPos = CGPoint.zero   // where the star was (to hold on its death)
+    var fired = false            // finale orb fired
+    var streak = 0, streakAt = -10.0
 }
 
 extension GameScene {
+    var starFighter: Fighter { fighters[min(director.star, fighters.count - 1)] }
+
     func startDirector() {
         director = DirectorState(start: simTime)
         finaleAt = nil; finaleCollapsedAt = nil
         cinema.blackout.alpha = 0
-        for b in brains { b.scripted = false }
         cinema.filmBars = 38
         hud.cinematic = true
-        // the hero drops in first; the bots portal in one by one a moment later
+        // the player drops in first; the others portal in one by one a moment later
         for f in fighters {
             f.alive = false; f.node.isHidden = true; f.spawnPoint = nil
             f.respawnAt = simTime + (f.isPlayer ? 0.35 : 2.6 + Double(f.id) * 0.35)
         }
-        if let b = brains.first(where: { $0.f === player }) {
-            b.holdUntil = simTime + 2.3
+        // everyone fights with style: flips, wall jumps, sharp aim
+        for b in brains {
+            b.scripted = false
             b.stylish = true
-            b.skillOverride = BotSkill(aimErr: 0.02, reaction: 0.08, burst: 1.1, pause: 0.18, grenadeChance: 0.012)
+            b.skillOverride = BotSkill(aimErr: 0.04, reaction: 0.14, burst: 0.9, pause: 0.25, grenadeChance: 0.008)
+            b.holdUntil = b.f.isPlayer ? simTime + 2.3 : 0
         }
     }
 
-    /// Finale: respawns stop, the hero flips up and fires one last giant black hole into the bots;
-    /// it drags them all in and its collapse kills everyone left.
+    /// Called from kill(): the star died, hand the camera to its killer after the kill beat.
+    func starKilled(_ f: Fighter, by k: Fighter?) {
+        director.lastPos = f.center
+        director.pendingStar = (k != nil && k !== f) ? k!.id : nil
+        director.switchAt = simTime + 0.35
+        cinema.slowMo(1.1, scale: 0.25, at: f.center, zoom: 1.5, force: true)
+        cinema.impactFlash(0.3)
+    }
+
+    /// Called from kill(): the star got a kill.
+    func starScored(_ victim: Fighter) {
+        if simTime - director.streakAt < 3.5 { director.streak += 1 } else { director.streak = 1 }
+        director.streakAt = simTime
+        hud.callout(["KILL", "DOUBLE KILL", "TRIPLE KILL", "QUAD KILL", "RAMPAGE"][min(director.streak - 1, 4)], color: starFighter.color)
+        cinema.slowMo(0.7, scale: 0.3, at: victim.center, zoom: 1.5)
+    }
+
+    private func nearestAlive(to p: CGPoint) -> Fighter? {
+        fighters.filter { $0.alive }.min { $0.center.dist(p) < $1.center.dist(p) }
+    }
+
+    // MARK: finale
+
+    /// Respawns stop; the star flips up and fires one oversized black hole into the others. Its
+    /// collapse kills everyone left, the camera stays on the last one standing, and the reel fades.
     func startFinale() {
+        if !starFighter.alive {
+            if let a = nearestAlive(to: director.lastPos) { director.star = a.id }
+            else { spawn(starFighter, at: spawnPoint()) }
+        }
         finaleAt = simTime
         finaleCollapsedAt = nil
-        if let b = brains.first(where: { $0.f === player }) { b.scripted = true }
-        player.input = FighterInput()
-        player.input.switchTo = 7
-        player.invulnUntil = 0
+        director.fired = false
+        director.pendingStar = nil
+        if let b = brains.first(where: { $0.f === starFighter }) { b.scripted = true }
+        starFighter.input = FighterInput()
+        starFighter.input.switchTo = 7
+        starFighter.invulnUntil = 0
     }
 
     func finaleCollapse(at p: CGPoint, owner: Int) {
@@ -52,14 +88,14 @@ extension GameScene {
     }
 
     private var finaleTarget: CGPoint {
-        let bots = fighters.filter { $0.alive && !$0.isPlayer }
-        guard !bots.isEmpty else { return player.center + CGPoint(x: player.facing * 250, y: 0) }
-        return bots.reduce(CGPoint.zero) { $0 + $1.center } * (1 / CGFloat(bots.count))
+        let others = fighters.filter { $0.alive && $0.id != director.star }
+        guard !others.isEmpty else { return starFighter.center + CGPoint(x: starFighter.facing * 250, y: 0) }
+        return others.reduce(CGPoint.zero) { $0 + $1.center } * (1 / CGFloat(others.count))
     }
 
     private func directFinale(_ fa: Double) {
         let t = simTime - fa
-        let hero = player!
+        let hero = starFighter
         let target = finaleTarget
         var inp = FighterInput()
         inp.aim = target
@@ -68,55 +104,47 @@ extension GameScene {
         inp.jumpHeld = t < 0.6
         if t > 0.42 && t < 0.47 && hero.airJumps > 0 { inp.jumpPressed = true } // front flip at the top
         hero.input = inp
-        if director.lastHeroKills >= 0 && t > 0.7 && director.shot != 99 {
-            // fire the finale orb once, from the top of the flip
-            director.shot = 99
+        if t > 0.7 && !director.fired {
+            director.fired = true
             let dir = (target - hero.muzzle).normalized
             spawnProjectile(.blackhole, at: hero.muzzle, vel: dir * 650, owner: hero.id)
             projectiles[projectiles.count - 1].power = 2.3
             Audio.shared.play(.blackhole, volume: 1, pan: pan(hero.muzzle))
             shake(6)
         }
-        // camera: wide on the fight, then settle on the lone hero
         if let c = finaleCollapsedAt, simTime - c > 0.12 {
             cinema.baseZoom = 1.55; cinema.baseFocus = hero.center + CGPoint(x: 0, y: 10)
         } else {
-            cinema.baseZoom = 1.12; cinema.baseFocus = (hero.center + target) * 0.5
+            cinema.baseZoom = 1.2; cinema.baseFocus = (hero.center + target) * 0.5
         }
     }
 
+    // MARK: per frame
+
     func direct() {
-        guard demo, let hero = player else { return }
+        guard demo else { return }
         if let fa = finaleAt { directFinale(fa); return }
         let t = simTime - director.start
-        let enemies = fighters.filter { $0.alive && !$0.isPlayer }
-        let nearest = enemies.min { $0.center.dist(hero.center) < $1.center.dist(hero.center) }
-        // opening: tight on the hero's portal, then pull out as the bots arrive
+        // hand over to the killer after the kill beat (or the nearest fighter if there's none)
+        if let next = director.pendingStar ?? (starFighter.alive ? nil : -1), simTime >= director.switchAt {
+            if next >= 0, next < fighters.count, fighters[next].alive { director.star = next }
+            else if let a = nearestAlive(to: director.lastPos) { director.star = a.id }
+            director.pendingStar = nil
+        }
+        let s = starFighter
+        if s.alive { director.lastPos = s.center }
+        // opening: tight on the player's portal, then settle into the follow-cam
         if t < 2.4 {
-            let p = hero.alive ? hero.center : (hero.spawnPoint ?? hero.center) + CGPoint(x: 0, y: 30)
-            cinema.baseZoom = t < 1.6 ? 1.7 : 1.35
+            let p = s.alive ? s.center : (s.spawnPoint ?? s.center) + CGPoint(x: 0, y: 30)
+            cinema.baseZoom = t < 1.6 ? 1.7 : 1.5
             cinema.baseFocus = p
             return
         }
-        if simTime >= director.shotUntil {
-            let close = nearest.map { $0.center.dist(hero.center) < 260 } ?? false
-            director.shot = close && rng.chance(0.6) ? 2 : (director.shot == 0 ? 1 : (rng.chance(0.5) ? 0 : 1))
-            director.shotUntil = simTime + Double(rng.range(2.8, 4.6))
-        }
-        let look = hero.alive ? (hero.input.aim - hero.center).normalized * 60 : .zero
-        let heroP = (hero.alive ? hero.center : (hero.spawnPoint ?? hero.center)) + look + CGPoint(x: hero.vel.x * 0.12, y: 0)
-        switch director.shot {
-        case 0:
-            cinema.baseZoom = 1.08
-            let anchor = stage.map { CGPoint(x: $0.midX, y: $0.midY) } ?? CGPoint(x: size.width / 2, y: size.height / 2)
-            cinema.baseFocus = (heroP + anchor) * 0.5
-        case 2:
-            let mid = nearest.map { (heroP + $0.center) * 0.5 } ?? heroP
-            cinema.baseZoom = 1.5
-            cinema.baseFocus = mid
-        default:
-            cinema.baseZoom = 1.28
-            cinema.baseFocus = heroP
-        }
+        // follow-cam: always on the star, leading a little toward where it's aiming / moving
+        let look = s.alive ? (s.input.aim - s.center).normalized * 55 : .zero
+        let lead = s.alive ? CGPoint(x: s.vel.x * 0.12, y: s.vel.y * 0.05) : .zero
+        let near = fighters.filter { $0.alive && $0.id != s.id }.map { $0.center.dist(director.lastPos) }.min() ?? 999
+        cinema.baseZoom = near < 220 ? 1.55 : 1.4
+        cinema.baseFocus = director.lastPos + look + lead
     }
 }

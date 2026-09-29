@@ -110,6 +110,12 @@ extension GameScene {
         shake(playerInvolved ? 7 : 3)
         hitStop(playerInvolved ? 0.06 : 0.02)
         let final = k.map { $0 !== f && $0.kills >= GameScene.scoreLimit } ?? false
+        // demo reels: the follow-cam star scores or dies
+        if demo && finaleAt == nil {
+            if f.id == director.star { starKilled(f, by: k) }
+            else if let k, k.id == director.star, k !== f { starScored(f) }
+            return
+        }
         // slow-motion shots on the moments that matter
         if final {
             cinema.slowMo(2.2, scale: 0.18, at: f.center, zoom: 1.45, force: true)

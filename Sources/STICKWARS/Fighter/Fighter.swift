@@ -199,8 +199,10 @@ final class Fighter {
                 pos.y = best; vel.y = 0; grounded = true; groundY = best; groundIsFloor = floor
                 airJumps = 1
             }
-        } else if pos.y + Move.height > bounds.height + 200 {
-            vel.y = min(vel.y, 0) // don't leave through the top forever
+        } else if pos.y + Move.height > bounds.height {
+            // the top of the screen is a ceiling: nobody flies off out of sight
+            pos.y = bounds.height - Move.height
+            vel.y = min(vel.y, 0)
         }
         if !grounded && wasGrounded { coyote = Move.coyote }
     }

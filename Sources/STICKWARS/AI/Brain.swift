@@ -239,7 +239,7 @@ final class Brain {
         for b in s.brains where b !== self && b.target == s.player.id { onPlayer += 1 }
         for o in s.fighters where o.alive && o.id != f.id {
             var score = o.pos.dist(f.pos) + rng.range(0, 140)
-            if o.isPlayer { score += s.demo ? -180 : CGFloat(onPlayer) * 260 }   // demo: the action comes to the hero
+            if o.isPlayer && !s.demo { score += CGFloat(onPlayer) * 260 }
             if o.id == f.lastHitBy && s.simTime - f.lastHitTime < 2.5 { score -= 250 }
             if s.simTime < o.invulnUntil { score += 300 }
             if score < bestScore { bestScore = score; best = o.id }

@@ -532,12 +532,10 @@ extension GameScene {
 
     func hurt(_ f: Fighter, amount: CGFloat, by: Int, dir: CGPoint, knock: CGFloat) {
         guard f.alive, simTime >= f.invulnUntil else { return }
-        if demo && finaleAt != nil && f.isPlayer { return }   // the hero survives the finale
+        if demo && finaleAt != nil && f.id == director.star { return }   // the star survives the finale
         var amount = amount
         // bots hit the player softer, by difficulty (the player has one life bar vs. several bots)
         if f.isPlayer && by >= 0 && by != f.id { amount *= [0.5, 0.7, 1.0][difficulty.rawValue] }
-        if demo && f.isPlayer { amount *= 0.35 }   // the demo hero is the star: tougher,
-        if demo && by == player.id && !f.isPlayer { amount *= 2.2 }   // and hits harder
         amount = absorbArmor(f, amount)
         f.hp -= amount
         f.hitFlash = 0.08

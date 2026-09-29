@@ -85,10 +85,7 @@ final class DevHarness {
                     // later 'play's reuse this snapshot, so several takes can be shot from one capture
                     fakeWindows = wins
                     desk = img
-                    // feature the Spotify window if it's on screen
-                    if let sp = wins.first(where: { $0.owner.contains("Spotify") && $0.layer == 0 }) {
-                        scene.stage = CGRect(x: sp.bounds.minX, y: scene.size.height - sp.bounds.maxY, width: sp.bounds.width, height: sp.bounds.height)
-                    }
+
                 } catch { return "capture failed: \(error)" }
             }
             let t0 = now()
@@ -197,6 +194,7 @@ final class DevHarness {
         let total = Int(seconds * Double(fps))
         var finale = false
         var heroAlive = 0
+        var camLog = ""
         for i in 0..<total {
             let sec = Double(i) / Double(fps)
             let slot = showcase[min(showcase.count - 1, Int(max(0, sec - 2.4) / ((seconds - 2.4) / Double(showcase.count))))]
@@ -204,13 +202,17 @@ final class DevHarness {
             // finale: last giant black hole takes everyone out, then fade to black
             if !finale && sec > seconds - 8 {
                 finale = true
-                if !scene.player.alive { scene.spawn(scene.player, at: scene.spawnPoint(inStage: true)) }
                 scene.startFinale()
             }
             scene.cinema.blackout.alpha = CGFloat(max(0, min(1, (sec - (seconds - 1.4)) / 1.2)))
             vt += 1.0 / Double(fps)
             renderer!.update(atTime: vt)
             if scene.player.alive { heroAlive += 1 }
+            if i % 60 == 0 {
+                let st = scene.starFighter
+                camLog += String(format: "t=%.0f star=%@ alive=%d pos=(%.0f,%.0f) cam=(%.0f,%.0f) scale=%.2f ts=%.2f\n", sec, st.name, st.alive ? 1 : 0,
+                                 st.center.x, st.center.y, scene.cinema.cam.position.x, scene.cinema.cam.position.y, scene.cinema.cam.xScale, scene.cinema.timeScale)
+            }
             rec.appendScene(renderer!, keep: i == total - 1)
             if i % 30 == 0 { try? await Task.sleep(nanoseconds: 100_000) } // let background work (nav graph) land
         }
@@ -254,7 +256,7 @@ final class DevHarness {
         } catch {}
         if muxed { try? FileManager.default.removeItem(atPath: silent); try? FileManager.default.removeItem(at: wav) }
         else { try? FileManager.default.moveItem(atPath: silent, toPath: path) }
-        return String(format: "hero alive %.0f%%, kills %d, deaths %d. ", Double(heroAlive) * 100 / Double(max(1, total)), scene.player.kills, scene.player.deaths) + String(format: "recorded %@ (audio %@, %d sounds) ", path, muxed ? "yes" : "no", Audio.shared.captured.count) + String(format: "recorded %@ %dx%d %d frames (%.1f s video) in %.1f s", path, W, H, rec.frames, Double(rec.frames) / Double(fps), now() - t0)
+        return camLog + String(format: "hero alive %.0f%%, kills %d, deaths %d. ", Double(heroAlive) * 100 / Double(max(1, total)), scene.player.kills, scene.player.deaths) + String(format: "recorded %@ (audio %@, %d sounds) ", path, muxed ? "yes" : "no", Audio.shared.captured.count) + String(format: "recorded %@ %dx%d %d frames (%.1f s video) in %.1f s", path, W, H, rec.frames, Double(rec.frames) / Double(fps), now() - t0)
     }
 
     private func perf(_ n: Int, each: ((Int) -> Void)? = nil) -> String {
