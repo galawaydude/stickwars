@@ -14,6 +14,15 @@ start)
     echo $! > $PIDFILE
     for _ in $(seq 50); do grep -q READY $OUT 2>/dev/null && break; sleep 0.1; done
     cat $OUT ;;
+start-installed)
+    # the installed app holds the Screen Recording / Accessibility grants
+    [ -f $PIDFILE ] && kill -USR2 "$(cat $PIDFILE)" 2>/dev/null && sleep 0.5 || true
+    pkill -f "/Applications/STICKWARS.app/Contents/MacOS/STICKWARS" 2>/dev/null && sleep 0.5 || true
+    rm -f $OUT
+    open -n -a /Applications/STICKWARS.app --args --dev ${DEV_ARGS:-}
+    for _ in $(seq 50); do grep -q READY $OUT 2>/dev/null && break; sleep 0.1; done
+    pgrep -n -f "/Applications/STICKWARS.app/Contents/MacOS/STICKWARS" > $PIDFILE
+    cat $OUT ;;
 stop)
     kill -USR2 "$(cat $PIDFILE)" 2>/dev/null || true; rm -f $PIDFILE ;;
 *)
