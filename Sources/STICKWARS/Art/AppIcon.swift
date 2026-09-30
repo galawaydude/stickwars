@@ -1,103 +1,119 @@
 import AppKit
 
-/// The app icon, drawn in code: an orange stick figure blasting a blue one off a broken screen,
-/// over the game's night-city backdrop. `build.sh` renders it into AppIcon.icns.
+/// The app icon, drawn in code: an orange stickman bursting out through a shattered app window,
+/// black space and stars behind the crack, glass shards flying. `build.sh` renders it into AppIcon.icns.
 enum AppIcon {
     static func image(_ px: Int) -> CGImage {
         let S = CGFloat(px) / 1024
         let ctx = CGContext(data: nil, width: px, height: px, bitsPerComponent: 8, bytesPerRow: 0, space: sRGB,
                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.scaleBy(x: S, y: S)
-        ctx.interpolationQuality = .none
+        func col(_ hex: UInt32, _ a: CGFloat = 1) -> CGColor {
+            CGColor(srgbRed: CGFloat(hex >> 16 & 255) / 255, green: CGFloat(hex >> 8 & 255) / 255, blue: CGFloat(hex & 255) / 255, alpha: a)
+        }
+        func poly(_ pts: [(CGFloat, CGFloat)]) -> CGPath {
+            let p = CGMutablePath()
+            p.addLines(between: pts.map { CGPoint(x: $0.0, y: $0.1) }); p.closeSubpath(); return p
+        }
 
-        // Squircle-ish tile with a soft shadow (macOS icon grid: 824 pt body inside 1024).
+        // macOS icon body (824 pt inside 1024) with a soft drop shadow
         let body = CGRect(x: 100, y: 100, width: 824, height: 824)
         let shape = CGPath(roundedRect: body, cornerWidth: 185, cornerHeight: 185, transform: nil)
         ctx.saveGState()
         ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: CGColor(gray: 0, alpha: 0.45))
-        ctx.addPath(shape); ctx.setFillColor(CGColor(srgbRed: 0.05, green: 0.03, blue: 0.12, alpha: 1)); ctx.fillPath()
+        ctx.addPath(shape); ctx.setFillColor(col(0x15131F)); ctx.fillPath()
         ctx.restoreGState()
         ctx.saveGState()
         ctx.addPath(shape); ctx.clip()
-        let sky = CGGradient(colorsSpace: sRGB, colors: [CGColor(srgbRed: 0.42, green: 0.15, blue: 0.45, alpha: 1),
-                                                         CGColor(srgbRed: 0.1, green: 0.06, blue: 0.25, alpha: 1),
-                                                         CGColor(srgbRed: 0.04, green: 0.03, blue: 0.12, alpha: 1)] as CFArray,
-                             locations: [0, 0.55, 1])!
-        ctx.drawLinearGradient(sky, start: CGPoint(x: 512, y: 100), end: CGPoint(x: 512, y: 924), options: [])
+        let bg = CGGradient(colorsSpace: sRGB, colors: [col(0x2A2440), col(0x121019), col(0x07070B)] as CFArray, locations: [0, 0.55, 1])!
+        ctx.drawLinearGradient(bg, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
 
-        // pixel stars and moon
-        var r = RNG(99)
-        ctx.setFillColor(CGColor(srgbRed: 0.8, green: 0.85, blue: 1, alpha: 1))
-        for _ in 0..<40 { ctx.fill(CGRect(x: 100 + (r.unit() * 820).rounded(), y: 560 + (r.unit() * 360).rounded(), width: 12, height: 12)) }
-        ctx.setFillColor(CGColor(srgbRed: 1, green: 0.95, blue: 0.82, alpha: 1))
-        ctx.fillEllipse(in: CGRect(x: 700, y: 730, width: 120, height: 120))
-
-        // pixel skyline
-        var x: CGFloat = 100
-        while x < 924 {
-            let w = CGFloat(48 + r.int(4) * 24), h = CGFloat(120 + r.int(9) * 24)
-            ctx.setFillColor(CGColor(srgbRed: 0.07, green: 0.04, blue: 0.14, alpha: 1))
-            ctx.fill(CGRect(x: x, y: 100, width: w, height: h))
-            ctx.setFillColor(CGColor(srgbRed: 1, green: 0.8, blue: 0.35, alpha: 1))
-            var wy: CGFloat = 124
-            while wy < 100 + h - 24 {
-                var wx = x + 12
-                while wx < x + w - 12 { if r.chance(0.3) { ctx.fill(CGRect(x: wx, y: wy, width: 12, height: 12)) }; wx += 24 }
-                wy += 36
-            }
-            x += w + 12
+        // the app window, slightly tilted
+        ctx.saveGState()
+        ctx.translateBy(x: 512, y: 500)
+        ctx.rotate(by: -0.08)
+        let win = CGRect(x: -300, y: -230, width: 600, height: 440)
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 30, color: CGColor(gray: 0, alpha: 0.6))
+        ctx.addPath(CGPath(roundedRect: win, cornerWidth: 34, cornerHeight: 34, transform: nil))
+        ctx.setFillColor(col(0xEEF0F6)); ctx.fillPath()
+        ctx.restoreGState()
+        // title bar + traffic lights + a few "content" lines
+        ctx.saveGState()
+        ctx.addPath(CGPath(roundedRect: win, cornerWidth: 34, cornerHeight: 34, transform: nil)); ctx.clip()
+        ctx.setFillColor(col(0xD9DCE6)); ctx.fill(CGRect(x: win.minX, y: win.maxY - 62, width: win.width, height: 62))
+        ctx.restoreGState()
+        for (i, c) in [0xFF5F57, 0xFEBC2E, 0x28C840].enumerated() {
+            ctx.setFillColor(col(UInt32(c)))
+            ctx.fillEllipse(in: CGRect(x: win.minX + 30 + CGFloat(i) * 40, y: win.maxY - 44, width: 26, height: 26))
         }
+        ctx.setFillColor(col(0xB9BDCB))
+        for (y, w) in [(118.0, 300.0), (82.0, 420.0), (46.0, 360.0)] { ctx.fill(CGRect(x: win.minX + 40, y: CGFloat(y), width: CGFloat(w), height: 18)) }
+        ctx.setFillColor(col(0x3B82F6)); ctx.fill(CGRect(x: win.minX + 40, y: -186, width: 150, height: 46))
 
-        // shattered "screen" slab the fighters stand on, with a crack
-        ctx.setFillColor(CGColor(srgbRed: 0.93, green: 0.94, blue: 0.97, alpha: 1))
-        let slab = CGMutablePath()
-        slab.addLines(between: [CGPoint(x: 150, y: 250), CGPoint(x: 880, y: 250), CGPoint(x: 880, y: 300), CGPoint(x: 610, y: 300),
-                                CGPoint(x: 585, y: 272), CGPoint(x: 560, y: 300), CGPoint(x: 150, y: 300)])
-        slab.closeSubpath()
-        ctx.addPath(slab); ctx.fillPath()
-        ctx.setFillColor(CGColor(srgbRed: 0.7, green: 0.72, blue: 0.8, alpha: 1))
-        ctx.fill(CGRect(x: 150, y: 250, width: 730, height: 10))
-
-        func stick(_ color: CGColor, _ pts: [(CGPoint, CGPoint)], head: CGPoint, w: CGFloat, headR: CGFloat) {
-            ctx.setStrokeColor(color); ctx.setLineWidth(w); ctx.setLineCap(.round)
-            for (a, b) in pts { ctx.move(to: a); ctx.addLine(to: b) }
+        // the crack: a jagged hole into black space with stars
+        let hole = poly([(-150, -120), (-60, -175), (40, -140), (120, -190), (170, -90), (150, 10), (200, 90), (80, 70),
+                         (20, 150), (-60, 70), (-160, 90), (-120, -10), (-200, -40)])
+        ctx.saveGState()
+        ctx.addPath(hole); ctx.clip()
+        ctx.setFillColor(col(0x040407)); ctx.fill(CGRect(x: -300, y: -300, width: 600, height: 600))
+        var r = RNG(11)
+        for _ in 0..<60 {
+            let s: CGFloat = r.chance(0.15) ? 7 : 4
+            ctx.setFillColor(col(r.chance(0.2) ? 0xFFF1D0 : 0xDDE6FF, r.range(0.5, 1)))
+            ctx.fill(CGRect(x: r.range(-210, 210), y: r.range(-200, 160), width: s, height: s))
+        }
+        ctx.restoreGState()
+        // crack lines radiating from the hole
+        ctx.setStrokeColor(col(0x2A2D3A, 0.85)); ctx.setLineWidth(5); ctx.setLineCap(.round); ctx.setLineJoin(.round)
+        for line in [[(170.0, -90.0), (240.0, -120.0), (285.0, -95.0)], [(-200, -40), (-260, -70), (-290, -40)],
+                     [(20, 150), (40, 195), (10, 208)], [(-150, -120), (-190, -190), (-240, -205)], [(200, 90), (255, 130)]] {
+            ctx.move(to: CGPoint(x: line[0].0, y: line[0].1))
+            for p in line.dropFirst() { ctx.addLine(to: CGPoint(x: p.0, y: p.1)) }
             ctx.strokePath()
-            ctx.setFillColor(color)
-            ctx.fillEllipse(in: CGRect(x: head.x - headR, y: head.y - headR, width: headR * 2, height: headR * 2))
+        }
+        ctx.restoreGState()
+
+        // glass shards flying out toward the top right
+        for (pts, a) in [([(640.0, 700.0), (700, 740), (668, 672)], 0.95), ([(724, 640), (790, 668), (746, 606)], 0.9),
+                         ([(600, 780), (636, 830), (650, 772)], 0.85), ([(790, 760), (842, 790), (818, 736)], 0.8),
+                         ([(360, 690), (318, 720), (340, 668)], 0.8), ([(700, 820), (730, 866), (748, 812)], 0.75)] as [([(CGFloat, CGFloat)], CGFloat)] {
+            ctx.addPath(poly(pts)); ctx.setFillColor(col(0xEEF0F6, a)); ctx.fillPath()
+            ctx.addPath(poly(pts)); ctx.setStrokeColor(col(0x9AA3B8, a)); ctx.setLineWidth(3); ctx.strokePath()
         }
 
-        // tracer from the gun to the blue fighter
-        ctx.setStrokeColor(CGColor(srgbRed: 0.55, green: 0.97, blue: 1, alpha: 0.95)); ctx.setLineWidth(14); ctx.setLineCap(.butt)
-        ctx.move(to: CGPoint(x: 700, y: 614)); ctx.addLine(to: CGPoint(x: 775, y: 540)); ctx.strokePath()
+        // the stickman leaping out of the crack, blaster first
+        let orange = col(0xF07D2A)
+        ctx.setStrokeColor(orange); ctx.setLineWidth(44); ctx.setLineCap(.round); ctx.setLineJoin(.round)
+        let hip = CGPoint(x: 455, y: 450), neck = CGPoint(x: 555, y: 575), sh = CGPoint(x: 545, y: 562)
+        let segs: [(CGPoint, CGPoint)] = [
+            (hip, neck),
+            (hip, CGPoint(x: 385, y: 432)), (CGPoint(x: 385, y: 432), CGPoint(x: 318, y: 468)),   // back leg kicking out
+            (hip, CGPoint(x: 468, y: 362)), (CGPoint(x: 468, y: 362), CGPoint(x: 405, y: 322)),   // front leg tucked
+            (sh, CGPoint(x: 630, y: 585)), (CGPoint(x: 630, y: 585), CGPoint(x: 708, y: 618)),    // gun arm
+            (sh, CGPoint(x: 615, y: 540)), (CGPoint(x: 615, y: 540), CGPoint(x: 690, y: 596)),    // support arm
+        ]
+        for (a, b) in segs { ctx.move(to: a); ctx.addLine(to: b) }
+        ctx.strokePath()
+        ctx.setFillColor(orange)
+        ctx.fillEllipse(in: CGRect(x: 548, y: 590, width: 104, height: 104))
 
-        // blue fighter, knocked back
-        let blue = CGColor(srgbRed: 0.23, green: 0.48, blue: 0.94, alpha: 1)
-        let bp = CGPoint(x: 790, y: 470)
-        stick(blue, [(bp, CGPoint(x: 830, y: 390)), (CGPoint(x: 830, y: 390), CGPoint(x: 880, y: 330)),
-                     (bp, CGPoint(x: 760, y: 380)), (CGPoint(x: 760, y: 380), CGPoint(x: 790, y: 310)),
-                     (bp, CGPoint(x: 820, y: 590)),
-                     (CGPoint(x: 815, y: 575), CGPoint(x: 880, y: 620)), (CGPoint(x: 815, y: 575), CGPoint(x: 760, y: 640))],
-              head: CGPoint(x: 850, y: 655), w: 34, headR: 42)
-        // impact burst: pixel squares
-        ctx.setFillColor(CGColor(srgbRed: 1, green: 0.9, blue: 0.4, alpha: 1))
-        for (dx, dy) in [(0, 0), (24, 12), (-24, 24), (12, -24), (36, -12), (-12, -36), (48, 24)] {
-            ctx.fill(CGRect(x: 760 + CGFloat(dx), y: 520 + CGFloat(dy), width: 20, height: 20))
-        }
-
-        // orange fighter, aiming
-        let orange = CGColor(srgbRed: 0xF0 / 255, green: 0x7D / 255, blue: 0x2A / 255, alpha: 1)
-        let hip = CGPoint(x: 330, y: 420), neck = CGPoint(x: 360, y: 575), sh = CGPoint(x: 356, y: 560)
-        stick(orange, [(hip, CGPoint(x: 400, y: 345)), (CGPoint(x: 400, y: 345), CGPoint(x: 410, y: 300)),
-                       (hip, CGPoint(x: 270, y: 350)), (CGPoint(x: 270, y: 350), CGPoint(x: 240, y: 300)),
-                       (hip, neck),
-                       (sh, CGPoint(x: 430, y: 560)), (CGPoint(x: 430, y: 560), CGPoint(x: 480, y: 565))],
-              head: CGPoint(x: 370, y: 640), w: 42, headR: 52)
-
-        // the game's own blaster (vector art), grip in the orange fighter's hand
-        let art = GunArts.blaster, gs: CGFloat = 5.2
+        // the game's blaster (vector art) in his hands
+        let art = GunArts.blaster, gs: CGFloat = 3.4
+        ctx.saveGState()
+        ctx.translateBy(x: 708, y: 618)
+        ctx.rotate(by: 0.35)
         let hgt = art.svg.size.height * gs
-        let origin = CGPoint(x: 480 - (art.grip.x + art.svg.pad) * gs, y: 565 - hgt + (art.grip.y + art.svg.pad) * gs)
-        art.svg.draw(in: ctx, scale: gs, height: hgt, origin: origin)
+        art.svg.draw(in: ctx, scale: gs, height: hgt,
+                     origin: CGPoint(x: -(art.grip.x + art.svg.pad) * gs, y: -hgt + (art.grip.y + art.svg.pad) * gs))
+        ctx.restoreGState()
+        // muzzle flash and a cyan bolt heading out of frame
+        ctx.setStrokeColor(col(0x8CF4FF)); ctx.setLineWidth(12); ctx.setLineCap(.butt)
+        ctx.move(to: CGPoint(x: 850, y: 716)); ctx.addLine(to: CGPoint(x: 940, y: 752)); ctx.strokePath()
+        ctx.setFillColor(col(0xFFD640))
+        for (dx, dy, s) in [(0.0, 0.0, 26.0), (22, 16, 16), (-8, 26, 14), (24, -14, 12)] {
+            ctx.fill(CGRect(x: 824 + CGFloat(dx), y: 700 + CGFloat(dy), width: CGFloat(s), height: CGFloat(s)))
+        }
         ctx.restoreGState()
         return ctx.makeImage()!
     }
